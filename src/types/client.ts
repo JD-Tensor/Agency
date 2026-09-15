@@ -32,7 +32,7 @@ export interface ClientProjectOrder {
 
 export interface ClientPortalCredentials {
   username: string;
-  password?: string;
+  // Only held in memory right after an admin issues it; never stored.
   temporaryPassword?: string;
   mustChangePassword?: boolean;
   generatedAt: string;
@@ -48,6 +48,7 @@ export interface ClientAccount {
   phone?: string;
   address?: string;
   avatarUrl?: string;
+  hasLogin?: boolean; // linked Supabase Auth account exists
   credentials: ClientPortalCredentials;
   orders: ClientProjectOrder[];
   sharedDocumentIds?: string[];

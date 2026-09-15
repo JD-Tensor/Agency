@@ -24,7 +24,7 @@ export const SendDocumentModal: React.FC<SendDocumentModalProps> = ({
   onClose,
   onSuccess
 }) => {
-  const { clients, sendDocumentToClient, unshareDocumentFromClient, savedDocuments } = useAgency();
+  const { clients, sendDocumentToClient, unshareDocumentFromClient } = useAgency();
 
   if (!isOpen || !doc) return null;
 
@@ -44,14 +44,21 @@ export const SendDocumentModal: React.FC<SendDocumentModalProps> = ({
   const targetClient = clients.find((c) => c.id === selectedClientId);
   const isAlreadyShared = targetClient?.sharedDocumentIds?.includes(doc.id) || (doc.clientId === targetClient?.id && doc.sharedWithClient);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!selectedClientId) return;
-    const ok = sendDocumentToClient(doc.id, selectedClientId, deliveryNotes);
+    const ok = await sendDocumentToClient(doc.id, selectedClientId, deliveryNotes);
     if (ok) {
       setIsSentSuccess(true);
-      const updated = savedDocuments.find((d) => d.id === doc.id);
-      if (updated && onSuccess) {
-        onSuccess(updated);
+      if (onSuccess) {
+        onSuccess({
+          ...doc,
+          clientId: selectedClientId,
+          clientName: targetClient?.companyName || doc.clientName,
+          status: doc.status === 'draft' ? 'issued' : doc.status,
+          sharedWithClient: true,
+          sharedAt: new Date().toISOString(),
+          clientNotes: deliveryNotes
+        });
       }
     }
   };

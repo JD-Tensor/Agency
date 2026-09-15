@@ -19,11 +19,11 @@ export const LoginModal: React.FC = () => {
 
   if (!loginModalOpen) return null;
 
-  const handleInitialLogin = (e: React.FormEvent) => {
+  const handleInitialLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
 
-    const res = login({ emailOrUsername: identifier, password });
+    const res = await login({ emailOrUsername: identifier, password });
 
     if (res.mustChangePassword && res.freelancerId) {
       // Transition to forced password recreation flow
@@ -41,7 +41,7 @@ export const LoginModal: React.FC = () => {
     }
   };
 
-  const handlePasswordResetSubmit = (e: React.FormEvent) => {
+  const handlePasswordResetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
 
@@ -57,7 +57,7 @@ export const LoginModal: React.FC = () => {
 
     if (!pendingFreelancerId) return;
 
-    const ok = completeFirstTimePasswordChange(pendingFreelancerId, newPassword);
+    const ok = await completeFirstTimePasswordChange(pendingFreelancerId, newPassword);
     if (ok) {
       setResetSuccess(true);
       setTimeout(() => {

@@ -1,550 +1,428 @@
 import { AgencyProfile } from '../types/agency';
-import { 
-  CustomRoleDefinition, 
-  ClientContractRecord, 
-  InvoiceRecord, 
-  PaymentRecord, 
-  ExpenseRecord, 
-  CapitalContributionRecord, 
-  PartnerEquityRecord, 
-  IpOwnershipRecord, 
-  AssetRecord, 
-  DebtRecord, 
-  TaxFilingRecord 
+import {
+  CustomRoleDefinition,
+  ClientContractRecord,
+  InvoiceRecord,
+  PaymentRecord,
+  ExpenseRecord,
+  CapitalContributionRecord,
+  PartnerEquityRecord,
+  IpOwnershipRecord,
+  AssetRecord,
+  DebtRecord,
+  TaxFilingRecord
 } from '../types/partnership';
 import { SavedDocument } from '../types/documents';
 import { Freelancer } from '../types/freelancers';
 import { ClientAccount } from '../types/client';
 import { Task } from '../types/tasks';
-import { supabase, isSupabaseConfigured } from './supabase';
+import { requireSupabase } from './supabase';
 
-// Helper to ensure Supabase client exists
-function getClient() {
-  if (!isSupabaseConfigured() || !supabase) {
-    return null;
+type Row = Record<string, any>;
+
+// Only send columns that exist in the table; UI objects carry extra fields.
+const pick = (source: Row, columns: readonly string[]): Row => {
+  const out: Row = {};
+  for (const col of columns) {
+    if (source[col] !== undefined) out[col] = source[col];
   }
-  return supabase;
-}
+  return out;
+};
 
-// 1. Profile
-export const fetchAgencyProfileApi = async (): Promise<AgencyProfile | null> => {
-  const client = getClient();
-  if (!client) return null;
-  const { data, error } = await client.from('agency_profile').select('*').limit(1).maybeSingle();
+const fail = (context: string, error: { message: string }): never => {
+  throw new Error(`${context}: ${error.message}`);
+};
+
+const selectAll = async <T>(table: string, orderBy: string, ascending = false): Promise<T[]> => {
+  const { data, error } = await requireSupabase().from(table).select('*').order(orderBy, { ascending });
+  if (error) fail(`Load ${table}`, error);
+  return (data || []) as T[];
+};
+
+const insertRow = async (table: string, row: Row) => {
+  const { error } = await requireSupabase().from(table).insert(row);
+  if (error) fail(`Create ${table}`, error);
+};
+
+const upsertRow = async (table: string, row: Row) => {
+  const { error } = await requireSupabase().from(table).upsert(row);
+  if (error) fail(`Save ${table}`, error);
+};
+
+const updateRow = async (table: string, key: string, id: string, patch: Row) => {
+  const { data, error } = await requireSupabase().from(table).update(patch).eq(key, id).select(key);
+  if (error) fail(`Update ${table}`, error);
+  if (!data || data.length === 0) {
+    throw new Error(`Update ${table}: no row changed (record missing or not permitted)`);
+  }
+};
+
+const deleteRow = async (table: string, key: string, id: string) => {
+  const { error } = await requireSupabase().from(table).delete().eq(key, id);
+  if (error) fail(`Delete ${table}`, error);
+};
+
+// ---------------------------------------------------------------------------
+// Auth
+// ---------------------------------------------------------------------------
+
+export const resolveLoginEmail = async (identifier: string): Promise<string | null> => {
+  if (identifier.includes('@')) return identifier;
+  const { data, error } = await requireSupabase().rpc('resolve_login_email', { identifier });
+  if (error) fail('Resolve username', error);
+  return (data as string | null) || null;
+};
+
+export const fetchStaffByAuthId = async (authUserId: string): Promise<Freelancer | null> => {
+  const { data, error } = await requireSupabase()
+    .from('users').select('*').eq('auth_user_id', authUserId).maybeSingle();
+  if (error) fail('Load account', error);
+  return data ? rowToFreelancer(data) : null;
+};
+
+export const fetchClientByAuthId = async (authUserId: string): Promise<ClientAccount | null> => {
+  const { data, error } = await requireSupabase()
+    .from('clients').select('*').eq('auth_user_id', authUserId).maybeSingle();
+  if (error) fail('Load client account', error);
+  return data ? rowToClient(data) : null;
+};
+
+export const completePasswordChangeApi = async () => {
+  const { error } = await requireSupabase().rpc('complete_password_change');
+  if (error) fail('Complete password change', error);
+};
+
+export const recordLoginApi = async () => {
+  const { error } = await requireSupabase().rpc('record_login');
+  if (error) fail('Record login', error);
+};
+
+export const updateOwnAccountApi = async (name: string, username: string) => {
+  const { error } = await requireSupabase().rpc('update_own_account', { p_name: name, p_username: username });
+  if (error) fail('Update account', error);
+};
+
+// Server-side login management (Edge Function holds the service role key).
+const callAdminUsers = async (body: { action: 'provision' | 'delete'; kind: 'user' | 'client'; id: string }) => {
+  const { data, error } = await requireSupabase().functions.invoke('admin-users', { body });
   if (error) {
-    console.error('Supabase fetchAgencyProfile error:', error.message);
-    return null;
+    let message = error.message;
+    try {
+      const detail = await (error as any).context?.json?.();
+      if (detail?.error) message = detail.error;
+    } catch {
+      // keep generic message
+    }
+    throw new Error(`Account service (admin-users Edge Function): ${message}`);
   }
-  return data as AgencyProfile | null;
+  return data as { success: boolean; temporaryPassword?: string };
+};
+
+export const provisionLoginApi = async (kind: 'user' | 'client', id: string): Promise<string> => {
+  const res = await callAdminUsers({ action: 'provision', kind, id });
+  if (!res?.temporaryPassword) throw new Error('Account service did not return a temporary password');
+  return res.temporaryPassword;
+};
+
+export const deleteAccountApi = async (kind: 'user' | 'client', id: string) => {
+  await callAdminUsers({ action: 'delete', kind, id });
+};
+
+// ---------------------------------------------------------------------------
+// 1. Agency profile
+// ---------------------------------------------------------------------------
+
+const PROFILE_COLUMNS = [
+  'name', 'tagline', 'email', 'phone', 'website', 'address', 'cityStateZip', 'country', 'taxId',
+  'logoUrl', 'defaultCurrency', 'currencySymbol', 'bankDetails', 'primarySigner', 'signatureStore'
+] as const;
+
+let profileRowId = 'firm-profile-1';
+
+export const fetchAgencyProfileApi = async (): Promise<AgencyProfile | null> => {
+  const { data, error } = await requireSupabase().from('agency_profile').select('*').limit(1).maybeSingle();
+  if (error) fail('Load agency profile', error);
+  if (!data) return null;
+  profileRowId = data.id;
+  const profile = pick(data, PROFILE_COLUMNS) as AgencyProfile;
+  if (!profile.logoUrl) delete profile.logoUrl;
+  return profile;
 };
 
 export const updateAgencyProfileApi = async (profile: AgencyProfile) => {
-  const client = getClient();
-  if (!client) return { success: false, error: 'Supabase not configured' };
-  const { error } = await client.from('agency_profile').upsert(profile);
-  if (error) throw new Error(error.message);
-  return { success: true, updatedAt: new Date().toISOString() };
+  await upsertRow('agency_profile', {
+    ...pick(profile, PROFILE_COLUMNS),
+    id: profileRowId,
+    updatedAt: new Date().toISOString()
+  });
 };
 
+// ---------------------------------------------------------------------------
 // 2. Roles
-export const fetchRolesApi = async (): Promise<CustomRoleDefinition[]> => {
-  const client = getClient();
-  if (!client) return [];
-  const { data, error } = await client.from('custom_roles').select('*').order('level', { ascending: false });
-  if (error) {
-    console.error('Supabase fetchRoles error:', error.message);
-    return [];
-  }
-  return (data || []) as CustomRoleDefinition[];
-};
+// ---------------------------------------------------------------------------
 
-export const createRoleApi = async (role: Partial<CustomRoleDefinition>, _actorLevel: number) => {
-  const client = getClient();
-  if (!client) throw new Error('Supabase not configured');
+const ROLE_COLUMNS = ['id', 'name', 'description', 'level', 'isSystem', 'permissions', 'createdAt'] as const;
+
+export const fetchRolesApi = () => selectAll<CustomRoleDefinition>('custom_roles', 'level');
+
+export const createRoleApi = async (role: Partial<CustomRoleDefinition>) => {
   const id = role.id || `role-${role.name?.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now().toString(36)}`;
-  const newRecord = { ...role, id, isSystem: false, createdAt: new Date().toISOString() };
-  const { data, error } = await client.from('custom_roles').insert(newRecord).select().single();
-  if (error) throw new Error(error.message);
+  const record = { ...pick(role, ROLE_COLUMNS), id, isSystem: false, createdAt: new Date().toISOString() };
+  const { data, error } = await requireSupabase().from('custom_roles').insert(record).select().single();
+  if (error) fail('Create role', error);
   return data as CustomRoleDefinition;
 };
 
-export const updateRoleApi = async (id: string, role: Partial<CustomRoleDefinition>, _actorLevel: number) => {
-  const client = getClient();
-  if (!client) throw new Error('Supabase not configured');
-  const { error } = await client.from('custom_roles').update(role).eq('id', id);
-  if (error) throw new Error(error.message);
-  return { success: true, id };
+export const updateRoleApi = (id: string, role: Partial<CustomRoleDefinition>) =>
+  updateRow('custom_roles', 'id', id, pick(role, ROLE_COLUMNS));
+
+// ---------------------------------------------------------------------------
+// 3. Team members
+// ---------------------------------------------------------------------------
+
+const USER_COLUMNS = [
+  'id', 'name', 'email', 'avatarUrl', 'role', 'roleLevel', 'accessLevel', 'status', 'paymentType',
+  'paymentAmount', 'hourlyRate', 'currency', 'skills', 'joinedDate', 'username', 'mustChangePassword',
+  'generatedAt', 'notes'
+] as const;
+
+const rowToFreelancer = (row: Row): Freelancer => ({
+  id: row.id,
+  name: row.name,
+  email: row.email,
+  avatarUrl: row.avatarUrl || undefined,
+  role: row.role,
+  roleLevel: row.roleLevel,
+  accessLevel: row.accessLevel,
+  paymentType: row.paymentType || 'fixed',
+  paymentAmount: Number(row.paymentAmount) || 0,
+  hourlyRate: Number(row.hourlyRate) || 0,
+  currency: row.currency || 'USD',
+  status: row.status,
+  skills: Array.isArray(row.skills) ? row.skills : [],
+  joinedDate: row.joinedDate || '',
+  hasLogin: Boolean(row.auth_user_id),
+  credentials: {
+    username: row.username,
+    mustChangePassword: Boolean(row.mustChangePassword),
+    generatedAt: row.generatedAt || '',
+    lastLoginAt: row.lastLoginAt || undefined
+  },
+  notes: row.notes || undefined
+});
+
+const freelancerToRow = (f: Freelancer): Row => pick({
+  ...f,
+  username: f.credentials?.username,
+  mustChangePassword: f.credentials?.mustChangePassword,
+  generatedAt: f.credentials?.generatedAt || undefined
+}, USER_COLUMNS);
+
+export const fetchUsersApi = async (): Promise<Freelancer[]> =>
+  (await selectAll<Row>('users', 'roleLevel')).map(rowToFreelancer);
+
+export const createUserApi = (user: Freelancer) => insertRow('users', freelancerToRow(user));
+
+export const updateUserApi = (user: Freelancer) => {
+  const { id, ...patch } = freelancerToRow(user);
+  return updateRow('users', 'id', user.id, patch);
 };
 
-// 3. Users / Team
-export const fetchUsersApi = async (): Promise<Freelancer[]> => {
-  const client = getClient();
-  if (!client) return [];
-  const { data, error } = await client.from('users').select('*').order('roleLevel', { ascending: false });
-  if (error) {
-    console.error('Supabase fetchUsers error:', error.message);
-    return [];
-  }
-  return (data || []) as unknown as Freelancer[];
-};
-
-export const createUserApi = async (user: any, _actorLevel: number) => {
-  const client = getClient();
-  if (!client) throw new Error('Supabase not configured');
-  const id = user.id || `usr-${Date.now().toString(36)}`;
-  const { error } = await client.from('users').insert({ ...user, id });
-  if (error) throw new Error(error.message);
-  return { success: true, id };
-};
-
-export const updateUserApi = async (id: string, user: any, _actorLevel: number) => {
-  const client = getClient();
-  if (!client) throw new Error('Supabase not configured');
-  const { data, error } = await client.from('users').update(user).eq('id', id).select();
-  if (error) throw new Error(error.message);
-  if (!data || data.length === 0) {
-    const { error: upsertErr } = await client.from('users').upsert({ ...user, id });
-    if (upsertErr) throw new Error(upsertErr.message);
-  }
-  return { success: true, id };
-};
-
-export const deleteUserApi = async (id: string, _actorLevel: number) => {
-  const client = getClient();
-  if (!client) throw new Error('Supabase not configured');
-  const { error } = await client.from('users').delete().eq('id', id);
-  if (error) throw new Error(error.message);
-  return { success: true, id };
-};
-
+// ---------------------------------------------------------------------------
 // 4. Clients
-export const fetchClientsApi = async (): Promise<ClientAccount[]> => {
-  const client = getClient();
-  if (!client) return [];
-  const { data, error } = await client.from('clients').select('*').order('companyName', { ascending: true });
-  if (error) {
-    console.error('Supabase fetchClients error:', error.message);
-    return [];
-  }
-  return (data || []) as unknown as ClientAccount[];
-};
+// ---------------------------------------------------------------------------
 
-export const createClientApi = async (newClient: any) => {
-  const client = getClient();
-  if (!client) throw new Error('Supabase not configured');
-  const id = newClient.id || `client-${Date.now().toString(36)}`;
-  const { error } = await client.from('clients').insert({ ...newClient, id });
-  if (error) throw new Error(error.message);
-  return { success: true, id };
-};
+const CLIENT_COLUMNS = [
+  'id', 'companyName', 'contactName', 'contactTitle', 'email', 'phone', 'address', 'avatarUrl',
+  'username', 'mustChangePassword', 'generatedAt', 'orders', 'sharedDocumentIds', 'notes', 'createdAt'
+] as const;
 
-export const updateClientApi = async (id: string, updatedClient: any) => {
-  const client = getClient();
-  if (!client) throw new Error('Supabase not configured');
-  const { error } = await client.from('clients').update(updatedClient).eq('id', id);
-  if (error) throw new Error(error.message);
-  return { success: true, id };
-};
+const rowToClient = (row: Row): ClientAccount => ({
+  id: row.id,
+  companyName: row.companyName,
+  contactName: row.contactName,
+  contactTitle: row.contactTitle || '',
+  email: row.email,
+  phone: row.phone || undefined,
+  address: row.address || undefined,
+  avatarUrl: row.avatarUrl || undefined,
+  hasLogin: Boolean(row.auth_user_id),
+  credentials: {
+    username: row.username,
+    mustChangePassword: Boolean(row.mustChangePassword),
+    generatedAt: row.generatedAt || '',
+    lastLoginAt: row.lastLoginAt || undefined
+  },
+  orders: Array.isArray(row.orders) ? row.orders : [],
+  sharedDocumentIds: Array.isArray(row.sharedDocumentIds) ? row.sharedDocumentIds : [],
+  notes: row.notes || undefined,
+  createdAt: row.createdAt
+});
 
-export const deleteClientApi = async (id: string) => {
-  const client = getClient();
-  if (!client) throw new Error('Supabase not configured');
-  const { error } = await client.from('clients').delete().eq('id', id);
-  if (error) throw new Error(error.message);
-  return { success: true, id };
-};
+const clientToRow = (c: ClientAccount): Row => pick({
+  ...c,
+  username: c.credentials?.username,
+  mustChangePassword: c.credentials?.mustChangePassword,
+  generatedAt: c.credentials?.generatedAt || undefined
+}, CLIENT_COLUMNS);
 
-// 5. Contracts
-export const fetchContractsApi = async (): Promise<ClientContractRecord[]> => {
-  const client = getClient();
-  if (!client) return [];
-  const { data, error } = await client.from('contracts').select('*').order('startDate', { ascending: false });
-  if (error) {
-    console.error('Supabase fetchContracts error:', error.message);
-    return [];
-  }
-  return (data || []) as ClientContractRecord[];
-};
+export const fetchClientsApi = async (): Promise<ClientAccount[]> =>
+  (await selectAll<Row>('clients', 'companyName', true)).map(rowToClient);
 
-export const createContractApi = async (contract: Partial<ClientContractRecord>) => {
-  const client = getClient();
-  if (!client) throw new Error('Supabase not configured');
-  const id = contract.id || `ct-${Date.now().toString(36)}`;
-  const { error } = await client.from('contracts').insert({ ...contract, id });
-  if (error) throw new Error(error.message);
-  return { success: true, id };
-};
+export const createClientApi = (client: ClientAccount) => insertRow('clients', clientToRow(client));
 
-export const updateContractApi = async (id: string, contract: Partial<ClientContractRecord>) => {
-  const client = getClient();
-  if (!client) throw new Error('Supabase not configured');
-  const { error } = await client.from('contracts').update(contract).eq('id', id);
-  if (error) throw new Error(error.message);
-  return { success: true, id };
-};
+export const updateClientApi = (id: string, patch: Partial<ClientAccount>) =>
+  updateRow('clients', 'id', id, pick(patch, CLIENT_COLUMNS));
 
-export const deleteContractApi = async (id: string) => {
-  const client = getClient();
-  if (!client) throw new Error('Supabase not configured');
-  const { error } = await client.from('contracts').delete().eq('id', id);
-  if (error) throw new Error(error.message);
-  return { success: true, id };
-};
+// ---------------------------------------------------------------------------
+// 5-14. Partnership ledgers
+// ---------------------------------------------------------------------------
 
-// 6. Invoices
-export const fetchInvoicesApi = async (): Promise<InvoiceRecord[]> => {
-  const client = getClient();
-  if (!client) return [];
-  const { data, error } = await client.from('invoices').select('*').order('issueDate', { ascending: false });
-  if (error) {
-    console.error('Supabase fetchInvoices error:', error.message);
-    return [];
-  }
-  return (data || []) as InvoiceRecord[];
-};
+const CONTRACT_COLUMNS = [
+  'id', 'contractNumber', 'title', 'clientId', 'clientName', 'type', 'contractValue', 'currency',
+  'startDate', 'endDate', 'signedDate', 'partnerInCharge', 'status', 'attachedDocId', 'termsSummary',
+  'ipOwnershipClause', 'createdAt', 'updatedAt'
+] as const;
 
-export const createInvoiceApi = async (invoice: Partial<InvoiceRecord>) => {
-  const client = getClient();
-  if (!client) throw new Error('Supabase not configured');
-  const id = invoice.id || `inv-${Date.now().toString(36)}`;
-  const { error } = await client.from('invoices').insert({ ...invoice, id });
-  if (error) throw new Error(error.message);
-  return { success: true, id };
-};
+export const fetchContractsApi = () => selectAll<ClientContractRecord>('contracts', 'startDate');
+export const createContractApi = (r: ClientContractRecord) => insertRow('contracts', pick(r, CONTRACT_COLUMNS));
+export const updateContractApi = (id: string, r: Partial<ClientContractRecord>) =>
+  updateRow('contracts', 'id', id, { ...pick(r, CONTRACT_COLUMNS), updatedAt: new Date().toISOString() });
+export const deleteContractApi = (id: string) => deleteRow('contracts', 'id', id);
 
-export const updateInvoiceApi = async (id: string, invoice: Partial<InvoiceRecord>) => {
-  const client = getClient();
-  if (!client) throw new Error('Supabase not configured');
-  const { error } = await client.from('invoices').update(invoice).eq('id', id);
-  if (error) throw new Error(error.message);
-  return { success: true, id };
-};
+const INVOICE_COLUMNS = [
+  'id', 'invoiceNumber', 'clientId', 'clientName', 'contractId', 'issueDate', 'dueDate', 'items',
+  'subtotal', 'taxPercent', 'taxAmount', 'discountAmount', 'grandTotal', 'paidAmount', 'status',
+  'paymentTerms', 'notes', 'createdAt', 'updatedAt'
+] as const;
 
-export const deleteInvoiceApi = async (id: string) => {
-  const client = getClient();
-  if (!client) throw new Error('Supabase not configured');
-  const { error } = await client.from('invoices').delete().eq('id', id);
-  if (error) throw new Error(error.message);
-  return { success: true, id };
-};
+export const fetchInvoicesApi = () => selectAll<InvoiceRecord>('invoices', 'issueDate');
+export const createInvoiceApi = (r: InvoiceRecord) => insertRow('invoices', pick(r, INVOICE_COLUMNS));
+export const updateInvoiceApi = (id: string, r: Partial<InvoiceRecord>) =>
+  updateRow('invoices', 'id', id, { ...pick(r, INVOICE_COLUMNS), updatedAt: new Date().toISOString() });
+export const deleteInvoiceApi = (id: string) => deleteRow('invoices', 'id', id);
 
-// 7. Payments
-export const fetchPaymentsApi = async (): Promise<PaymentRecord[]> => {
-  const client = getClient();
-  if (!client) return [];
-  const { data, error } = await client.from('payments').select('*').order('paymentDate', { ascending: false });
-  if (error) {
-    console.error('Supabase fetchPayments error:', error.message);
-    return [];
-  }
-  return (data || []) as PaymentRecord[];
-};
+const PAYMENT_COLUMNS = [
+  'id', 'paymentNumber', 'invoiceId', 'contractId', 'clientId', 'clientName', 'amount', 'currency',
+  'paymentDate', 'paymentMethod', 'transactionRef', 'depositingBank', 'receiptDocId', 'notes',
+  'recordedBy', 'createdAt'
+] as const;
 
-export const createPaymentApi = async (payment: Partial<PaymentRecord>) => {
-  const client = getClient();
-  if (!client) throw new Error('Supabase not configured');
-  const id = payment.id || `pay-${Date.now().toString(36)}`;
-  const { error } = await client.from('payments').insert({ ...payment, id });
-  if (error) throw new Error(error.message);
-  return { success: true, id };
-};
+export const fetchPaymentsApi = () => selectAll<PaymentRecord>('payments', 'paymentDate');
+export const createPaymentApi = (r: PaymentRecord) => insertRow('payments', pick(r, PAYMENT_COLUMNS));
+export const deletePaymentApi = (id: string) => deleteRow('payments', 'id', id);
 
-export const deletePaymentApi = async (id: string) => {
-  const client = getClient();
-  if (!client) throw new Error('Supabase not configured');
-  const { error } = await client.from('payments').delete().eq('id', id);
-  if (error) throw new Error(error.message);
-  return { success: true, id };
-};
+const EXPENSE_COLUMNS = [
+  'id', 'expenseNumber', 'title', 'category', 'vendor', 'amount', 'currency', 'date', 'paidBy',
+  'reimbursementStatus', 'taxDeductible', 'receiptAttachmentName', 'notes', 'recordedBy', 'createdAt'
+] as const;
 
-// 8. Expenses
-export const fetchExpensesApi = async (): Promise<ExpenseRecord[]> => {
-  const client = getClient();
-  if (!client) return [];
-  const { data, error } = await client.from('expenses').select('*').order('date', { ascending: false });
-  if (error) {
-    console.error('Supabase fetchExpenses error:', error.message);
-    return [];
-  }
-  return (data || []) as ExpenseRecord[];
-};
+export const fetchExpensesApi = () => selectAll<ExpenseRecord>('expenses', 'date');
+export const createExpenseApi = (r: ExpenseRecord) => insertRow('expenses', pick(r, EXPENSE_COLUMNS));
+export const deleteExpenseApi = (id: string) => deleteRow('expenses', 'id', id);
 
-export const createExpenseApi = async (expense: Partial<ExpenseRecord>) => {
-  const client = getClient();
-  if (!client) throw new Error('Supabase not configured');
-  const id = expense.id || `exp-${Date.now().toString(36)}`;
-  const { error } = await client.from('expenses').insert({ ...expense, id });
-  if (error) throw new Error(error.message);
-  return { success: true, id };
-};
+const CAPITAL_COLUMNS = [
+  'id', 'partnerName', 'partnerId', 'amount', 'currency', 'date', 'contributionType', 'transactionRef',
+  'bankAccount', 'notes', 'createdAt'
+] as const;
 
-export const deleteExpenseApi = async (id: string) => {
-  const client = getClient();
-  if (!client) throw new Error('Supabase not configured');
-  const { error } = await client.from('expenses').delete().eq('id', id);
-  if (error) throw new Error(error.message);
-  return { success: true, id };
-};
+export const fetchCapitalContributionsApi = () => selectAll<CapitalContributionRecord>('capital_contributions', 'date');
+export const createCapitalContributionApi = (r: CapitalContributionRecord) =>
+  insertRow('capital_contributions', pick(r, CAPITAL_COLUMNS));
 
-// 9. Capital Contributions
-export const fetchCapitalContributionsApi = async (): Promise<CapitalContributionRecord[]> => {
-  const client = getClient();
-  if (!client) return [];
-  const { data, error } = await client.from('capital_contributions').select('*').order('date', { ascending: false });
-  if (error) {
-    console.error('Supabase fetchCapitalContributions error:', error.message);
-    return [];
-  }
-  return (data || []) as CapitalContributionRecord[];
-};
+const EQUITY_COLUMNS = [
+  'partnerName', 'designation', 'email', 'ownershipPercentage', 'profitSharePercentage',
+  'initialCapitalContribution', 'totalContributed', 'totalDrawings', 'netCapitalBalance', 'signatureImage'
+] as const;
 
-export const createCapitalContributionApi = async (contrib: Partial<CapitalContributionRecord>) => {
-  const client = getClient();
-  if (!client) throw new Error('Supabase not configured');
-  const id = contrib.id || `cap-${Date.now().toString(36)}`;
-  const { error } = await client.from('capital_contributions').insert({ ...contrib, id });
-  if (error) throw new Error(error.message);
-  return { success: true, id };
-};
+export const fetchEquityApi = () => selectAll<PartnerEquityRecord>('partner_equity', 'ownershipPercentage');
+export const updateEquityApi = (partnerId: string, r: Partial<PartnerEquityRecord>) =>
+  updateRow('partner_equity', 'partnerId', partnerId, { ...pick(r, EQUITY_COLUMNS), lastUpdated: new Date().toISOString() });
 
-// 10. Partner Equity
-export const fetchPartnerEquityApi = async (): Promise<PartnerEquityRecord[]> => {
-  const client = getClient();
-  if (!client) return [];
-  const { data, error } = await client.from('partner_equity').select('*').order('ownershipPercentage', { ascending: false });
-  if (error) {
-    console.error('Supabase fetchPartnerEquity error:', error.message);
-    return [];
-  }
-  return (data || []) as PartnerEquityRecord[];
-};
+const IP_COLUMNS = [
+  'id', 'title', 'repositoryUrl', 'commitHashOrVersion', 'ownershipType', 'clientAssignmentId',
+  'clientName', 'primaryAuthorPartner', 'registrationDate', 'legalStatus', 'licenseTerms', 'summary', 'createdAt'
+] as const;
 
-export const updatePartnerEquityApi = async (partnerId: string, equity: Partial<PartnerEquityRecord>) => {
-  const client = getClient();
-  if (!client) throw new Error('Supabase not configured');
-  const { data, error } = await client.from('partner_equity').update(equity).eq('partnerId', partnerId).select();
-  if (error) throw new Error(error.message);
-  if (!data || data.length === 0) {
-    const { error: upsertErr } = await client.from('partner_equity').upsert({ ...equity, partnerId });
-    if (upsertErr) throw new Error(upsertErr.message);
-  }
-  return { success: true, partnerId };
-};
+export const fetchIpRegistryApi = () => selectAll<IpOwnershipRecord>('ip_ownership', 'createdAt');
+export const createIpRecordApi = (r: IpOwnershipRecord) => insertRow('ip_ownership', pick(r, IP_COLUMNS));
+export const updateIpRecordApi = (id: string, r: Partial<IpOwnershipRecord>) =>
+  updateRow('ip_ownership', 'id', id, pick(r, IP_COLUMNS));
+export const deleteIpRecordApi = (id: string) => deleteRow('ip_ownership', 'id', id);
 
-// 11. IP / Code Ownership
-export const fetchIpOwnershipApi = async (): Promise<IpOwnershipRecord[]> => {
-  const client = getClient();
-  if (!client) return [];
-  const { data, error } = await client.from('ip_ownership').select('*').order('createdAt', { ascending: false });
-  if (error) {
-    console.error('Supabase fetchIpOwnership error:', error.message);
-    return [];
-  }
-  return (data || []) as IpOwnershipRecord[];
-};
+const ASSET_COLUMNS = [
+  'id', 'assetNumber', 'name', 'category', 'purchaseDate', 'purchaseCost', 'currentBookValue',
+  'depreciationRatePercent', 'assignedTo', 'serialNumberOrKey', 'condition', 'notes', 'createdAt', 'updatedAt'
+] as const;
 
-export const createIpRecordApi = async (record: Partial<IpOwnershipRecord>) => {
-  const client = getClient();
-  if (!client) throw new Error('Supabase not configured');
-  const id = record.id || `ip-${Date.now().toString(36)}`;
-  const { error } = await client.from('ip_ownership').insert({ ...record, id });
-  if (error) throw new Error(error.message);
-  return { success: true, id };
-};
+export const fetchAssetsApi = () => selectAll<AssetRecord>('assets', 'createdAt');
+export const createAssetApi = (r: AssetRecord) => insertRow('assets', pick(r, ASSET_COLUMNS));
+export const updateAssetApi = (id: string, r: Partial<AssetRecord>) =>
+  updateRow('assets', 'id', id, { ...pick(r, ASSET_COLUMNS), updatedAt: new Date().toISOString() });
+export const deleteAssetApi = (id: string) => deleteRow('assets', 'id', id);
 
-export const updateIpRecordApi = async (id: string, record: Partial<IpOwnershipRecord>) => {
-  const client = getClient();
-  if (!client) throw new Error('Supabase not configured');
-  const { error } = await client.from('ip_ownership').update(record).eq('id', id);
-  if (error) throw new Error(error.message);
-  return { success: true, id };
-};
+const DEBT_COLUMNS = [
+  'id', 'debtNumber', 'creditor', 'debtType', 'principalAmount', 'currentBalance', 'interestRatePercent',
+  'repaymentTermMonths', 'monthlyPayment', 'startDate', 'maturityDate', 'status', 'notes', 'createdAt', 'updatedAt'
+] as const;
 
-export const deleteIpRecordApi = async (id: string) => {
-  const client = getClient();
-  if (!client) throw new Error('Supabase not configured');
-  const { error } = await client.from('ip_ownership').delete().eq('id', id);
-  if (error) throw new Error(error.message);
-  return { success: true, id };
-};
+export const fetchDebtsApi = () => selectAll<DebtRecord>('debts', 'createdAt');
+export const createDebtApi = (r: DebtRecord) => insertRow('debts', pick(r, DEBT_COLUMNS));
+export const updateDebtApi = (id: string, r: Partial<DebtRecord>) =>
+  updateRow('debts', 'id', id, { ...pick(r, DEBT_COLUMNS), updatedAt: new Date().toISOString() });
+export const deleteDebtApi = (id: string) => deleteRow('debts', 'id', id);
 
-// 12. Assets
-export const fetchAssetsApi = async (): Promise<AssetRecord[]> => {
-  const client = getClient();
-  if (!client) return [];
-  const { data, error } = await client.from('assets').select('*').order('createdAt', { ascending: false });
-  if (error) {
-    console.error('Supabase fetchAssets error:', error.message);
-    return [];
-  }
-  return (data || []) as AssetRecord[];
-};
+const TAX_COLUMNS = [
+  'id', 'filingNumber', 'taxType', 'title', 'fiscalYear', 'periodOrQuarter', 'dueDate', 'filingDate',
+  'ackNumberOrArn', 'taxLiabilityAmount', 'taxPaidAmount', 'status', 'signedByPartner', 'auditorNotes',
+  'createdAt', 'updatedAt'
+] as const;
 
-export const createAssetApi = async (asset: Partial<AssetRecord>) => {
-  const client = getClient();
-  if (!client) throw new Error('Supabase not configured');
-  const id = asset.id || `ast-${Date.now().toString(36)}`;
-  const { error } = await client.from('assets').insert({ ...asset, id });
-  if (error) throw new Error(error.message);
-  return { success: true, id };
-};
+export const fetchTaxFilingsApi = () => selectAll<TaxFilingRecord>('tax_filings', 'dueDate');
+export const createTaxFilingApi = (r: TaxFilingRecord) => insertRow('tax_filings', pick(r, TAX_COLUMNS));
+export const updateTaxFilingApi = (id: string, r: Partial<TaxFilingRecord>) =>
+  updateRow('tax_filings', 'id', id, { ...pick(r, TAX_COLUMNS), updatedAt: new Date().toISOString() });
+export const deleteTaxFilingApi = (id: string) => deleteRow('tax_filings', 'id', id);
 
-export const updateAssetApi = async (id: string, asset: Partial<AssetRecord>) => {
-  const client = getClient();
-  if (!client) throw new Error('Supabase not configured');
-  const { error } = await client.from('assets').update(asset).eq('id', id);
-  if (error) throw new Error(error.message);
-  return { success: true, id };
-};
-
-export const deleteAssetApi = async (id: string) => {
-  const client = getClient();
-  if (!client) throw new Error('Supabase not configured');
-  const { error } = await client.from('assets').delete().eq('id', id);
-  if (error) throw new Error(error.message);
-  return { success: true, id };
-};
-
-// 13. Debts
-export const fetchDebtsApi = async (): Promise<DebtRecord[]> => {
-  const client = getClient();
-  if (!client) return [];
-  const { data, error } = await client.from('debts').select('*').order('createdAt', { ascending: false });
-  if (error) {
-    console.error('Supabase fetchDebts error:', error.message);
-    return [];
-  }
-  return (data || []) as DebtRecord[];
-};
-
-export const createDebtApi = async (debt: Partial<DebtRecord>) => {
-  const client = getClient();
-  if (!client) throw new Error('Supabase not configured');
-  const id = debt.id || `dbt-${Date.now().toString(36)}`;
-  const { error } = await client.from('debts').insert({ ...debt, id });
-  if (error) throw new Error(error.message);
-  return { success: true, id };
-};
-
-export const updateDebtApi = async (id: string, debt: Partial<DebtRecord>) => {
-  const client = getClient();
-  if (!client) throw new Error('Supabase not configured');
-  const { error } = await client.from('debts').update(debt).eq('id', id);
-  if (error) throw new Error(error.message);
-  return { success: true, id };
-};
-
-export const deleteDebtApi = async (id: string) => {
-  const client = getClient();
-  if (!client) throw new Error('Supabase not configured');
-  const { error } = await client.from('debts').delete().eq('id', id);
-  if (error) throw new Error(error.message);
-  return { success: true, id };
-};
-
-// 14. Tax Filings
-export const fetchTaxFilingsApi = async (): Promise<TaxFilingRecord[]> => {
-  const client = getClient();
-  if (!client) return [];
-  const { data, error } = await client.from('tax_filings').select('*').order('dueDate', { ascending: false });
-  if (error) {
-    console.error('Supabase fetchTaxFilings error:', error.message);
-    return [];
-  }
-  return (data || []) as TaxFilingRecord[];
-};
-
-export const createTaxFilingApi = async (filing: Partial<TaxFilingRecord>) => {
-  const client = getClient();
-  if (!client) throw new Error('Supabase not configured');
-  const id = filing.id || `tax-${Date.now().toString(36)}`;
-  const { error } = await client.from('tax_filings').insert({ ...filing, id });
-  if (error) throw new Error(error.message);
-  return { success: true, id };
-};
-
-export const updateTaxFilingApi = async (id: string, filing: Partial<TaxFilingRecord>) => {
-  const client = getClient();
-  if (!client) throw new Error('Supabase not configured');
-  const { error } = await client.from('tax_filings').update(filing).eq('id', id);
-  if (error) throw new Error(error.message);
-  return { success: true, id };
-};
-
-export const deleteTaxFilingApi = async (id: string) => {
-  const client = getClient();
-  if (!client) throw new Error('Supabase not configured');
-  const { error } = await client.from('tax_filings').delete().eq('id', id);
-  if (error) throw new Error(error.message);
-  return { success: true, id };
-};
-
+// ---------------------------------------------------------------------------
 // 15. Documents
-export const fetchDocumentsApi = async (): Promise<SavedDocument[]> => {
-  const client = getClient();
-  if (!client) return [];
-  const { data, error } = await client.from('documents').select('*').order('updatedAt', { ascending: false });
-  if (error) {
-    console.error('Supabase fetchDocuments error:', error.message);
-    return [];
-  }
-  return (data || []) as SavedDocument[];
+// ---------------------------------------------------------------------------
+
+const DOCUMENT_COLUMNS = [
+  'id', 'type', 'title', 'docNumber', 'createdAt', 'updatedAt', 'clientName', 'clientId', 'status',
+  'payload', 'agencySnapshot', 'sharedWithClient', 'sharedAt', 'clientNotes'
+] as const;
+
+export const fetchDocumentsApi = () => selectAll<SavedDocument>('documents', 'updatedAt');
+export const saveDocumentApi = (doc: SavedDocument) => upsertRow('documents', pick(doc, DOCUMENT_COLUMNS));
+export const deleteDocumentApi = (id: string) => deleteRow('documents', 'id', id);
+
+export const deleteAllDocumentsApi = async () => {
+  const { error } = await requireSupabase().from('documents').delete().not('id', 'is', null);
+  if (error) fail('Delete documents', error);
 };
 
-export const saveDocumentApi = async (doc: SavedDocument) => {
-  const client = getClient();
-  if (!client) throw new Error('Supabase not configured');
-  const { error } = await client.from('documents').upsert(doc);
-  if (error) throw new Error(error.message);
-  return { success: true, id: doc.id };
-};
-
-export const deleteDocumentApi = async (id: string) => {
-  const client = getClient();
-  if (!client) throw new Error('Supabase not configured');
-  const { error } = await client.from('documents').delete().eq('id', id);
-  if (error) throw new Error(error.message);
-  return { success: true, id };
-};
-
+// ---------------------------------------------------------------------------
 // 16. Tasks
-export const fetchTasksApi = async (): Promise<Task[]> => {
-  const client = getClient();
-  if (!client) return [];
-  const { data, error } = await client.from('tasks').select('*').order('createdAt', { ascending: false });
-  if (error) {
-    console.error('Supabase fetchTasks error:', error.message);
-    return [];
-  }
-  return (data || []) as Task[];
-};
+// ---------------------------------------------------------------------------
 
-export const createTaskApi = async (task: Partial<Task>) => {
-  const client = getClient();
-  if (!client) throw new Error('Supabase not configured');
-  const id = task.id || `tsk-${Date.now().toString(36)}`;
-  const { error } = await client.from('tasks').insert({ ...task, id });
-  if (error) throw new Error(error.message);
-  return { success: true, id };
-};
+const TASK_COLUMNS = [
+  'id', 'title', 'description', 'freelancerId', 'freelancerName', 'assignedBy', 'projectName', 'clientName',
+  'priority', 'status', 'dueDate', 'estimatedHours', 'actualHours', 'deliverables', 'createdAt', 'updatedAt'
+] as const;
 
-export const updateTaskApi = async (id: string, task: Partial<Task>) => {
-  const client = getClient();
-  if (!client) throw new Error('Supabase not configured');
-  const { error } = await client.from('tasks').update(task).eq('id', id);
-  if (error) throw new Error(error.message);
-  return { success: true, id };
-};
+export const fetchTasksApi = async (): Promise<Task[]> =>
+  (await selectAll<Row>('tasks', 'createdAt')).map((row) => ({
+    ...row,
+    description: row.description || '',
+    projectName: row.projectName || '',
+    assignedBy: row.assignedBy || '',
+    freelancerName: row.freelancerName || '',
+    deliverables: Array.isArray(row.deliverables) ? row.deliverables : [],
+    updatedAt: row.updatedAt || row.createdAt
+  }) as Task);
 
-export const deleteTaskApi = async (id: string) => {
-  const client = getClient();
-  if (!client) throw new Error('Supabase not configured');
-  const { error } = await client.from('tasks').delete().eq('id', id);
-  if (error) throw new Error(error.message);
-  return { success: true, id };
-};
-
-// Aliases for compatibility
-export const fetchEquityApi = fetchPartnerEquityApi;
-export const updateEquityApi = updatePartnerEquityApi;
-export const fetchIpRegistryApi = fetchIpOwnershipApi;
+export const createTaskApi = (task: Task) => insertRow('tasks', pick(task, TASK_COLUMNS));
+export const updateTaskApi = (id: string, patch: Partial<Task>) =>
+  updateRow('tasks', 'id', id, { ...pick(patch, TASK_COLUMNS), updatedAt: new Date().toISOString() });
+export const deleteTaskApi = (id: string) => deleteRow('tasks', 'id', id);

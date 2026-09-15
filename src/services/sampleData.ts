@@ -15,7 +15,7 @@ export const defaultSubhadipSignature: StoredSignature = {
   id: 'sig-subhadip-jana',
   name: 'Subhadip Jana',
   title: 'Senior Managing Partner',
-  email: 'subhadipjana866@gmail.com',
+  email: 'subhadipjana@jdtensor.com',
   partnerId: 'usr-subhadip',
   signatureImage: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 80' width='320' height='80'><path d='M20,50 C32,22 45,12 52,28 C58,40 64,54 70,52 C78,48 84,32 92,30 C100,28 104,44 112,42 C122,38 132,22 144,36 C152,45 160,55 170,48 C180,42 188,28 198,30 C210,32 216,48 230,42 C242,36 252,20 264,38 C272,50 284,54 300,32' fill='none' stroke='%230f172a' stroke-width='2.8' stroke-linecap='round' stroke-linejoin='round'/><path d='M28,62 C85,57 175,52 285,48' fill='none' stroke='%230f172a' stroke-width='2' stroke-linecap='round'/></svg>",
   signatureText: 'Subhadip Jana',
@@ -27,7 +27,7 @@ export const defaultShayanSignature: StoredSignature = {
   id: 'sig-shayan-das',
   name: 'Shayan Das',
   title: 'Senior Managing Partner',
-  email: 'shayandas267@gmail.com',
+  email: 'shayandas@jdtensor.com',
   partnerId: 'usr-shayan',
   signatureImage: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 80' width='320' height='80'><path d='M22,38 C34,18 46,14 50,30 C54,46 58,58 68,52 C78,44 82,24 94,22 C106,20 110,48 118,50 C128,52 138,34 148,30 C158,26 168,44 178,46 C190,48 198,28 212,26 C226,24 236,46 250,44 C264,42 278,22 292,36 C298,42 304,46 308,44' fill='none' stroke='%230f172a' stroke-width='2.8' stroke-linecap='round' stroke-linejoin='round'/><path d='M40,66 C105,58 195,54 290,52' fill='none' stroke='%230f172a' stroke-width='2' stroke-linecap='round'/></svg>",
   signatureText: 'Shayan Das',
@@ -63,7 +63,7 @@ export const defaultAgencyProfile: AgencyProfile = {
   primarySigner: {
     name: 'Subhadip Jana',
     title: 'Senior Managing Partner',
-    email: 'subhadipjana866@gmail.com',
+    email: 'subhadipjana@jdtensor.com',
     signatureText: 'Subhadip Jana',
     signatureImage: defaultSubhadipSignature.signatureImage
   },

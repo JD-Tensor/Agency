@@ -43,8 +43,8 @@ export const ClientManagementDirectory: React.FC = () => {
     );
   });
 
-  const handleResetPassword = (c: ClientAccount) => {
-    const res = regenerateClientCredentials(c.id);
+  const handleResetPassword = async (c: ClientAccount) => {
+    const res = await regenerateClientCredentials(c.id);
     if (res.newPassword) {
       setActivePasswordSlip({ id: c.id, password: res.newPassword });
     }

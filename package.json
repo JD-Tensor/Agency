@@ -7,19 +7,11 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "db:export-sql": "node scripts/export_sqlite_to_sql.js",
-    "db:setup-clean": "python3 scripts/setup_clean_db.py",
-    "db:migrate-to-supabase": "node scripts/migrate_sqlite_to_supabase.js"
+    "functions:deploy": "npx supabase functions deploy admin-users"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",
-    "@types/better-sqlite3": "^9.6.0",
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.6",
-    "better-sqlite3": "^13.0.3",
     "clsx": "^2.1.1",
-    "cors": "^2.8.6",
-    "express": "^5.2.1",
     "html2pdf.js": "^0.10.2",
     "lucide-react": "^0.475.0",
     "react": "^18.3.1",

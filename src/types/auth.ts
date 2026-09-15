@@ -7,7 +7,6 @@ export interface AuthUser {
   name: string;
   email: string;
   username?: string;
-  password?: string;
   role: string;
   accessLevel: UserAccessLevel;
   isOwner?: boolean;

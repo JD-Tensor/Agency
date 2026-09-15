@@ -36,7 +36,6 @@ export const PartnershipHub: React.FC = () => {
     taxFilings, 
     setCurrentView, 
     currentUser, 
-    switchTestUser,
     activeCurrency,
     setActiveCurrency,
     formatMoney
@@ -182,7 +181,7 @@ export const PartnershipHub: React.FC = () => {
                     ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
                     : 'bg-parchment-100 text-ink-700 border-parchment-300 hover:bg-parchment-200'
                 }`}
-                title="Inspect or configure Supabase cloud database"
+                title="Supabase database status and setup"
               >
                 <Database className={`w-3 h-3 ${isSupabaseConfigured() ? 'text-emerald-600' : 'text-ink-500'}`} />
                 <span>{isSupabaseConfigured() ? 'Supabase Cloud Connected' : 'Database: Connect Supabase Cloud'}</span>
@@ -213,7 +212,7 @@ export const PartnershipHub: React.FC = () => {
             </div>
           </div>
 
-          {/* Quick RBAC Role Tester */}
+          {/* Signed-in Account */}
           <div className="p-4 bg-parchment-50 rounded-xl border border-parchment-200/80 min-w-[280px]">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-600">
@@ -231,40 +230,6 @@ export const PartnershipHub: React.FC = () => {
 
             <div className="text-sm font-semibold text-ink-900">{currentUser?.name || 'Authorized User'}</div>
             <div className="text-xs text-ink-500">{currentUser?.email || ''}</div>
-
-            <div className="mt-3 pt-2 border-t border-parchment-200 flex flex-wrap gap-1.5">
-              <span className="text-[10px] text-ink-400 w-full mb-0.5">Switch Identity to verify RBAC hierarchy:</span>
-              <button
-                onClick={() => switchTestUser('usr-subhadip')}
-                className="text-[10px] px-2 py-0.5 rounded bg-white hover:bg-clay-50 border border-parchment-200 text-ink-700 font-medium"
-              >
-                Subhadip (Partner)
-              </button>
-              <button
-                onClick={() => switchTestUser('usr-shayan')}
-                className="text-[10px] px-2 py-0.5 rounded bg-white hover:bg-clay-50 border border-parchment-200 text-ink-700 font-medium"
-              >
-                Shayan (Partner)
-              </button>
-              <button
-                onClick={() => switchTestUser('usr-admin-1')}
-                className="text-[10px] px-2 py-0.5 rounded bg-white hover:bg-blue-50 border border-parchment-200 text-ink-700 font-medium"
-              >
-                Rohan (Admin)
-              </button>
-              <button
-                onClick={() => switchTestUser('usr-mgr-1')}
-                className="text-[10px] px-2 py-0.5 rounded bg-white hover:bg-amber-50 border border-parchment-200 text-ink-700 font-medium"
-              >
-                Ananya (Manager)
-              </button>
-              <button
-                onClick={() => switchTestUser('usr-auditor-1')}
-                className="text-[10px] px-2 py-0.5 rounded bg-white hover:bg-emerald-50 border border-parchment-200 text-ink-700 font-medium"
-              >
-                Kavita (Auditor)
-              </button>
-            </div>
           </div>
         </div>
       </div>
@@ -308,7 +273,7 @@ export const PartnershipHub: React.FC = () => {
           <div>
             <h2 className="text-lg font-serif font-bold text-ink-950">The 10 Partnership Ledgers</h2>
             <p className="text-xs text-ink-500">
-              Complete, immutable operational registers stored in SQLite localdb, ready for Supabase migration.
+              Operational registers stored in the Supabase cloud database, protected by row level security.
             </p>
           </div>
 

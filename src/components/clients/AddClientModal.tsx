@@ -36,33 +36,41 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose 
 
   const [createdClient, setCreatedClient] = useState<ClientAccount | null>(null);
   const [copied, setCopied] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newClient = addNewClient({
-      companyName,
-      contactName,
-      contactTitle,
-      email,
-      phone,
-      address,
-      projectTitle: projectTitle || `${companyName} Project Engagement`,
-      projectDescription: projectDescription || 'Core development and design sprint deliverables.',
-      budgetTotal,
-      currency,
-      targetDeliveryDate,
-      projectLeadId: projectLeadId || freelancers[0]?.id || '',
-      assignedFreelancerIds: selectedFreelancerIds.length > 0 ? selectedFreelancerIds : [projectLeadId],
-      communicationChannels: {
-        slackChannel: `#${companyName.toLowerCase().replace(/[^a-z0-9]/g, '')}-sync`,
-        meetingSchedule: 'Weekly Sprint Sync — Thursdays 10:00 AM EST',
-        contactEmail: email
-      }
-    });
+    setSubmitting(true);
+    try {
+      const newClient = await addNewClient({
+        companyName,
+        contactName,
+        contactTitle,
+        email,
+        phone,
+        address,
+        projectTitle: projectTitle || `${companyName} Project Engagement`,
+        projectDescription: projectDescription || 'Core development and design sprint deliverables.',
+        budgetTotal,
+        currency,
+        targetDeliveryDate,
+        projectLeadId: projectLeadId || freelancers[0]?.id || '',
+        assignedFreelancerIds: selectedFreelancerIds.length > 0 ? selectedFreelancerIds : [projectLeadId],
+        communicationChannels: {
+          slackChannel: `#${companyName.toLowerCase().replace(/[^a-z0-9]/g, '')}-sync`,
+          meetingSchedule: 'Weekly Sprint Sync — Thursdays 10:00 AM EST',
+          contactEmail: email
+        }
+      });
 
-    setCreatedClient(newClient);
+      setCreatedClient(newClient);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleCopyInvitation = () => {
@@ -332,10 +340,11 @@ Security Notice: On your first sign-in, you will establish your private permanen
                 </button>
                 <button
                   type="submit"
-                  className="bg-clay-600 hover:bg-clay-700 text-white text-xs font-medium px-4 py-1.5 rounded-lg transition shadow-xs flex items-center gap-1.5"
+                  disabled={submitting}
+                  className="bg-clay-600 hover:bg-clay-700 text-white text-xs font-medium px-4 py-1.5 rounded-lg transition shadow-xs flex items-center gap-1.5 disabled:opacity-70"
                 >
                   <KeyRound className="w-3.5 h-3.5" />
-                  <span>Generate Client Portal & Credentials</span>
+                  <span>{submitting ? 'Creating Login...' : 'Generate Client Portal & Credentials'}</span>
                 </button>
               </div>
             </form>

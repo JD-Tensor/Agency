@@ -25,24 +25,32 @@ export const AddFreelancerModal: React.FC<AddFreelancerModalProps> = ({ isOpen, 
 
   const [createdFreelancer, setCreatedFreelancer] = useState<Freelancer | null>(null);
   const [copied, setCopied] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const skills = skillsString.split(',').map((s) => s.trim()).filter(Boolean);
-    const newFl = addNewFreelancer({
-      name,
-      email,
-      role,
-      accessLevel,
-      paymentType,
-      paymentAmount,
-      currency,
-      skills,
-      notes
-    });
-    setCreatedFreelancer(newFl);
+    setSubmitting(true);
+    try {
+      const newFl = await addNewFreelancer({
+        name,
+        email,
+        role,
+        accessLevel,
+        paymentType,
+        paymentAmount,
+        currency,
+        skills,
+        notes
+      });
+      setCreatedFreelancer(newFl);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleCopyCredentials = () => {
@@ -268,10 +276,11 @@ Security Note: Upon your first login, you will be prompted to establish your per
                 </button>
                 <button
                   type="submit"
-                  className="bg-clay-600 hover:bg-clay-700 text-white text-xs font-medium px-4 py-1.5 rounded-lg transition shadow-xs flex items-center gap-1.5"
+                  disabled={submitting}
+                  className="bg-clay-600 hover:bg-clay-700 text-white text-xs font-medium px-4 py-1.5 rounded-lg transition shadow-xs flex items-center gap-1.5 disabled:opacity-70"
                 >
                   <KeyRound className="w-3.5 h-3.5" />
-                  <span>Generate Credentials & Onboard</span>
+                  <span>{submitting ? 'Creating Login...' : 'Generate Credentials & Onboard'}</span>
                 </button>
               </div>
             </form>

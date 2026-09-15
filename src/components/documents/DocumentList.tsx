@@ -99,15 +99,15 @@ export const DocumentList: React.FC = () => {
           {canCreateDocs && savedDocuments.length > 0 && (
             <button
               onClick={() => {
-                if (confirm('Are you sure you want to clear all sample documents? This will give you a clean, empty document archive.')) {
+                if (confirm('Permanently delete ALL documents from the database? This cannot be undone.')) {
                   clearAllDocs();
                 }
               }}
               className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium border border-rose-200 text-rose-600 hover:bg-rose-50 transition"
-              title="Wipe demo documents and start fresh"
+              title="Permanently delete every document in the archive"
             >
               <Trash2 className="w-3.5 h-3.5" />
-              <span>Clear Sample Documents</span>
+              <span>Delete All Documents</span>
             </button>
           )}
           {canCreateDocs && (

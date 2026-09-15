@@ -25,7 +25,15 @@ import { RoleManagementView } from './components/roles/RoleManagementView';
 import { LoginPage } from './components/auth/LoginPage';
 
 const AppContent: React.FC = () => {
-  const { currentView, editingDocument, currentUser } = useAgency();
+  const { currentView, editingDocument, currentUser, authLoading } = useAgency();
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen w-full bg-[#fbf9f5] flex items-center justify-center text-xs text-ink-500">
+        Restoring session...
+      </div>
+    );
+  }
 
   // If user is not authenticated, display the login page ONLY
   if (!currentUser) {

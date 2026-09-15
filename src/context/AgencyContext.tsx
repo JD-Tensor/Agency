@@ -1,10 +1,10 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { AgencyProfile, StoredSignature } from '../types/agency';
 import { SavedDocument, DocumentType, DocumentPayload } from '../types/documents';
 import { Freelancer, AccessLevel, PaymentType } from '../types/freelancers';
 import { Task, TaskStatus, TaskDeliverable } from '../types/tasks';
 import { AuthUser, LoginCredentials } from '../types/auth';
-import { 
+import {
   CustomRoleDefinition,
   ClientContractRecord,
   InvoiceRecord,
@@ -17,58 +17,27 @@ import {
   DebtRecord,
   TaxFilingRecord
 } from '../types/partnership';
-import { 
-  getAgencyProfile, 
-  saveAgencyProfile, 
-  getSavedDocuments, 
-  saveDocument, 
-  deleteDocument, 
-  clearAllDocuments,
-  duplicateDocument,
-  exportAllData,
-  importAllData 
-} from '../services/storage';
-import { 
-  getStoredFreelancers, 
-  saveFreelancer, 
-  deleteFreelancer, 
-  resetFreelancerPassword,
-  changeFreelancerPassword,
-  getStoredTasks,
-  saveTask,
-  updateTaskStatus,
-  submitTaskDeliverable,
-  deleteTask,
-  generateSecureTemporaryPassword,
-  generateUsername
-} from '../services/freelancerStorage';
-import { 
-  sampleDiscoveryCall, 
-  sampleProposal, 
+import {
+  sampleDiscoveryCall,
+  sampleProposal,
   sampleQuotation,
   sampleRateChart,
-  sampleOnboarding, 
-  sampleNda, 
-  sampleInvoice, 
-  sampleReceipt, 
+  sampleOnboarding,
+  sampleNda,
+  sampleInvoice,
+  sampleReceipt,
   sampleOffboarding,
+  defaultAgencyProfile,
   defaultSignatureStore
 } from '../services/sampleData';
 import { ClientAccount } from '../types/client';
-import { 
-  getStoredClients, 
-  saveClient, 
-  deleteClient, 
-  resetClientPassword,
-  shareDocumentWithClient,
-  unshareDocumentWithClient
-} from '../services/clientStorage';
 import * as api from '../services/api';
-import { 
-  CurrencyCode, 
-  formatMoney as formatMoneyUtil, 
-  convertAmount, 
-  normalizeCurrencyCode 
+import { supabase, requireSupabase } from '../services/supabase';
+import {
+  CurrencyCode,
+  formatMoney as formatMoneyUtil,
+  convertAmount,
+  normalizeCurrencyCode
 } from '../services/currency';
 
 export interface LoginResult {
@@ -79,8 +48,8 @@ export interface LoginResult {
   error?: string;
 }
 
-export type AppView = 
-  | 'dashboard' 
+export type AppView =
+  | 'dashboard'
   | 'partnership_hub'
   | 'contracts_ledger'
   | 'financial_ledgers'
@@ -89,13 +58,13 @@ export type AppView =
   | 'assets_debts'
   | 'tax_filings'
   | 'roles_matrix'
-  | 'hub' 
-  | 'editor' 
-  | 'library' 
+  | 'hub'
+  | 'editor'
+  | 'library'
   | 'clients'
-  | 'freelancers' 
-  | 'tasks' 
-  | 'my_workspace' 
+  | 'freelancers'
+  | 'tasks'
+  | 'my_workspace'
   | 'client_portal'
   | 'settings';
 
@@ -120,25 +89,24 @@ interface AgencyContextType {
   clearAllDocs: () => void;
   cloneDoc: (id: string) => void;
   exportDataJson: () => void;
-  importDataJson: (json: string) => boolean;
+  importDataJson: (json: string) => Promise<boolean>;
   refreshDocs: () => void;
 
-  // Freelancer & Task & Auth State
+  // Auth (Supabase Auth)
+  authLoading: boolean;
   currentUser: AuthUser | null;
   isAuthenticated: boolean;
   loginModalOpen: boolean;
   setLoginModalOpen: (open: boolean) => void;
-  login: (creds: LoginCredentials) => LoginResult;
+  login: (creds: LoginCredentials) => Promise<LoginResult>;
   logout: () => void;
-  switchUser: (targetId: string) => void;
-  switchTestUser: (userId: string) => void;
-  completeFirstTimePasswordChange: (freelancerId: string, newPassword: string) => boolean;
+  completeFirstTimePasswordChange: (freelancerId: string, newPassword: string) => Promise<boolean>;
   updateAccountCredentials: (data: {
     email?: string;
     password?: string;
     username?: string;
     name?: string;
-  }) => Promise<{ success: boolean; error?: string }>;
+  }) => Promise<{ success: boolean; error?: string; notice?: string }>;
 
   // Clients
   clients: ClientAccount[];
@@ -168,11 +136,11 @@ interface AgencyContextType {
       status: 'completed' | 'in_progress' | 'todo';
       dueDate: string;
     }[];
-  }) => ClientAccount;
-  removeClientItem: (id: string) => void;
-  regenerateClientCredentials: (id: string) => { newPassword: string; client: ClientAccount | null };
-  sendDocumentToClient: (docId: string, clientId: string, notes?: string) => boolean;
-  unshareDocumentFromClient: (docId: string, clientId: string) => boolean;
+  }) => Promise<ClientAccount>;
+  removeClientItem: (id: string) => Promise<void>;
+  regenerateClientCredentials: (id: string) => Promise<{ newPassword: string; client: ClientAccount | null }>;
+  sendDocumentToClient: (docId: string, clientId: string, notes?: string) => Promise<boolean>;
+  unshareDocumentFromClient: (docId: string, clientId: string) => Promise<boolean>;
 
   // Team & Tasks
   freelancers: Freelancer[];
@@ -188,10 +156,10 @@ interface AgencyContextType {
     skills: string[];
     notes?: string;
     roleLevel?: number;
-  }) => Freelancer;
-  updateFreelancerItem: (freelancer: Freelancer) => void;
-  removeFreelancer: (id: string) => void;
-  regeneratePassword: (id: string) => { newPassword: string; freelancer: Freelancer | null };
+  }) => Promise<Freelancer>;
+  updateFreelancerItem: (freelancer: Freelancer) => Promise<void>;
+  removeFreelancer: (id: string) => Promise<void>;
+  regeneratePassword: (id: string) => Promise<{ newPassword: string; freelancer: Freelancer | null }>;
 
   allocateTask: (data: {
     title: string;
@@ -202,10 +170,10 @@ interface AgencyContextType {
     priority: Task['priority'];
     dueDate: string;
     estimatedHours?: number;
-  }) => Task;
-  changeTaskStatus: (taskId: string, status: TaskStatus) => void;
-  submitDeliverable: (taskId: string, deliverable: TaskDeliverable) => void;
-  removeTask: (taskId: string) => void;
+  }) => Promise<Task>;
+  changeTaskStatus: (taskId: string, status: TaskStatus) => Promise<void>;
+  submitDeliverable: (taskId: string, deliverable: TaskDeliverable) => Promise<void>;
+  removeTask: (taskId: string) => Promise<void>;
 
   // 10 Partnership Ledgers
   contracts: ClientContractRecord[];
@@ -268,17 +236,42 @@ interface AgencyContextType {
 
 const AgencyContext = createContext<AgencyContextType | undefined>(undefined);
 
+const CURRENCY_PREF_KEY = 'agency_active_currency';
+
+const generateUsername = (name: string, email: string): string => {
+  if (email && email.includes('@')) {
+    return email.split('@')[0].toLowerCase().replace(/[^a-z0-9._-]/g, '');
+  }
+  return name.toLowerCase().trim().replace(/\s+/g, '.').replace(/[^a-z0-9._-]/g, '');
+};
+
+const errorMessage = (err: unknown): string =>
+  err instanceof Error ? err.message : String(err);
+
+const reportError = (action: string, err: unknown) => {
+  console.error(`${action} failed:`, err);
+  alert(`${action} failed.\n\n${errorMessage(err)}`);
+};
+
 export const AgencyProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [agencyProfile, setAgencyProfileState] = useState<AgencyProfile>(getAgencyProfile);
+  const [agencyProfile, setAgencyProfileState] = useState<AgencyProfile>(defaultAgencyProfile);
   const [activeCurrency, setActiveCurrencyState] = useState<CurrencyCode>(() => {
-    const saved = localStorage.getItem('agency_active_currency');
-    if (saved === 'INR' || saved === 'USD') return saved;
-    return normalizeCurrencyCode(getAgencyProfile().defaultCurrency);
+    try {
+      const saved = localStorage.getItem(CURRENCY_PREF_KEY);
+      if (saved === 'INR' || saved === 'USD') return saved;
+    } catch {
+      // display preference only
+    }
+    return normalizeCurrencyCode(defaultAgencyProfile.defaultCurrency);
   });
 
   const setActiveCurrency = (curr: CurrencyCode) => {
     setActiveCurrencyState(curr);
-    localStorage.setItem('agency_active_currency', curr);
+    try {
+      localStorage.setItem(CURRENCY_PREF_KEY, curr);
+    } catch {
+      // display preference only
+    }
     const newSymbol = curr === 'INR' ? '₹' : '$';
     setAgencyProfileState(prev => ({
       ...prev,
@@ -318,172 +311,244 @@ export const AgencyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [taxFilings, setTaxFilings] = useState<TaxFilingRecord[]>([]);
   const [customRoles, setCustomRoles] = useState<CustomRoleDefinition[]>([]);
 
-  // Two Founding Senior Managing Partners (Level 100)
-  const defaultSubhadipPartner: AuthUser = {
-    id: 'usr-subhadip',
-    name: 'Subhadip Jana',
-    email: 'subhadipjana866@gmail.com',
-    username: 'subhadip866',
-    role: 'Senior Managing Partner',
-    roleName: 'partner',
-    roleLevel: 100,
-    accessLevel: 'admin',
-    isOwner: true,
-    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256'
+  // Session state. The Supabase Auth session is the only source of identity.
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [authLoading, setAuthLoading] = useState<boolean>(true);
+  // Signed in with a temporary password; app access waits for a new password.
+  const pendingPasswordChange = useRef<boolean>(false);
+
+  const clearAllState = () => {
+    setCurrentUser(null);
+    setAgencyProfileState(defaultAgencyProfile);
+    setSavedDocuments([]);
+    setEditingDocument(null);
+    setFreelancers([]);
+    setTasks([]);
+    setClients([]);
+    setContracts([]);
+    setInvoices([]);
+    setPayments([]);
+    setExpenses([]);
+    setCapitalContributions([]);
+    setPartnerEquity([]);
+    setIpRecords([]);
+    setAssets([]);
+    setDebts([]);
+    setTaxFilings([]);
+    setCustomRoles([]);
   };
 
-  const defaultShayanPartner: AuthUser = {
-    id: 'usr-shayan',
-    name: 'Shayan Das',
-    email: 'shayandas267@gmail.com',
-    username: 'shayan267',
-    role: 'Senior Managing Partner',
-    roleName: 'partner',
-    roleLevel: 100,
-    accessLevel: 'admin',
-    isOwner: true,
-    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=256'
-  };
-
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
-    try {
-      const savedAuth = localStorage.getItem('agency_active_auth_user');
-      if (savedAuth) {
-        const parsed = JSON.parse(savedAuth);
-        if (parsed && parsed.id) {
-          // Sanitize legacy titles / emails
-          if (parsed.id === 'usr-subhadip') {
-            parsed.role = 'Senior Managing Partner';
-            if (parsed.email === 'subhadip@janadas.agency') parsed.email = 'subhadipjana866@gmail.com';
-            if (!parsed.username || parsed.username === 'subhadip') parsed.username = 'subhadip866';
-          } else if (parsed.id === 'usr-shayan') {
-            parsed.role = 'Senior Managing Partner';
-            if (parsed.email === 'shayan@janadas.agency') parsed.email = 'shayandas267@gmail.com';
-            if (!parsed.username || parsed.username === 'shayan') parsed.username = 'shayan267';
-          }
-          return parsed;
+  // Build the app identity for a Supabase Auth user from the linked row.
+  const resolveAuthUser = async (authUserId: string): Promise<{
+    user: AuthUser | null;
+    mustChangePassword: boolean;
+    rowId?: string;
+    displayName?: string;
+  }> => {
+    const staff = await api.fetchStaffByAuthId(authUserId);
+    if (staff) {
+      if (staff.status === 'offboarded') return { user: null, mustChangePassword: false };
+      const level = staff.roleLevel ?? 40;
+      return {
+        mustChangePassword: Boolean(staff.credentials.mustChangePassword),
+        rowId: staff.id,
+        displayName: staff.name,
+        user: {
+          id: staff.id,
+          name: staff.name,
+          email: staff.email,
+          username: staff.credentials.username,
+          role: staff.role,
+          roleLevel: level,
+          roleName: level === 100 ? 'partner' : undefined,
+          accessLevel: staff.accessLevel,
+          isOwner: level === 100,
+          avatarUrl: staff.avatarUrl,
+          freelancerId: staff.id
         }
-      }
-    } catch {
-      // fallback
+      };
     }
-    return null;
-  });
 
-  // Fetch all data from SQLite backend API
+    const client = await api.fetchClientByAuthId(authUserId);
+    if (client) {
+      return {
+        mustChangePassword: Boolean(client.credentials.mustChangePassword),
+        rowId: client.id,
+        displayName: `${client.contactName} (${client.companyName})`,
+        user: {
+          id: client.id,
+          name: client.contactName,
+          email: client.email,
+          username: client.credentials.username,
+          role: client.contactTitle,
+          roleLevel: 10,
+          accessLevel: 'client',
+          isOwner: false,
+          clientId: client.id,
+          clientCompanyName: client.companyName
+        }
+      };
+    }
+
+    return { user: null, mustChangePassword: false };
+  };
+
+  const landingViewFor = (user: AuthUser): AppView => {
+    if (user.accessLevel === 'client') return 'client_portal';
+    if (user.accessLevel === 'contributor' || user.accessLevel === 'restricted') return 'my_workspace';
+    return 'partnership_hub';
+  };
+
+  // Fetch all data from Supabase. RLS decides what this account may see.
   const refreshAllApiData = async () => {
+    if (!supabase) return;
+    const results = await Promise.allSettled([
+      api.fetchRolesApi(),
+      api.fetchUsersApi(),
+      api.fetchClientsApi(),
+      api.fetchContractsApi(),
+      api.fetchInvoicesApi(),
+      api.fetchPaymentsApi(),
+      api.fetchExpensesApi(),
+      api.fetchCapitalContributionsApi(),
+      api.fetchEquityApi(),
+      api.fetchIpRegistryApi(),
+      api.fetchAssetsApi(),
+      api.fetchDebtsApi(),
+      api.fetchTaxFilingsApi(),
+      api.fetchDocumentsApi(),
+      api.fetchTasksApi(),
+      api.fetchAgencyProfileApi()
+    ] as const);
+
+    const [
+      rolesData, usersData, clientsData, contractsData, invoicesData, paymentsData, expensesData,
+      capitalData, equityData, ipData, assetsData, debtsData, taxesData, docsData, tasksData, profileData
+    ] = results;
+
+    if (rolesData.status === 'fulfilled') setCustomRoles(rolesData.value);
+    if (usersData.status === 'fulfilled') {
+      // Keep temporary passwords issued during this session visible to the admin.
+      setFreelancers(prev => usersData.value.map(f => {
+        const temp = prev.find(p => p.id === f.id)?.credentials.temporaryPassword;
+        return temp && f.credentials.mustChangePassword
+          ? { ...f, credentials: { ...f.credentials, temporaryPassword: temp } }
+          : f;
+      }));
+    }
+    if (clientsData.status === 'fulfilled') {
+      setClients(prev => clientsData.value.map(c => {
+        const temp = prev.find(p => p.id === c.id)?.credentials.temporaryPassword;
+        return temp && c.credentials.mustChangePassword
+          ? { ...c, credentials: { ...c.credentials, temporaryPassword: temp } }
+          : c;
+      }));
+    }
+    if (contractsData.status === 'fulfilled') setContracts(contractsData.value);
+    if (invoicesData.status === 'fulfilled') setInvoices(invoicesData.value);
+    if (paymentsData.status === 'fulfilled') setPayments(paymentsData.value);
+    if (expensesData.status === 'fulfilled') setExpenses(expensesData.value);
+    if (capitalData.status === 'fulfilled') setCapitalContributions(capitalData.value);
+    if (equityData.status === 'fulfilled') setPartnerEquity(equityData.value);
+    if (ipData.status === 'fulfilled') setIpRecords(ipData.value);
+    if (assetsData.status === 'fulfilled') setAssets(assetsData.value);
+    if (debtsData.status === 'fulfilled') setDebts(debtsData.value);
+    if (taxesData.status === 'fulfilled') setTaxFilings(taxesData.value);
+    if (docsData.status === 'fulfilled') setSavedDocuments(docsData.value);
+    if (tasksData.status === 'fulfilled') setTasks(tasksData.value);
+    if (profileData.status === 'fulfilled' && profileData.value) {
+      const profile = profileData.value;
+      setAgencyProfileState(profile);
+      try {
+        if (!localStorage.getItem(CURRENCY_PREF_KEY)) {
+          setActiveCurrencyState(normalizeCurrencyCode(profile.defaultCurrency));
+        }
+      } catch {
+        // display preference only
+      }
+    }
+
+    results.forEach(r => {
+      if (r.status === 'rejected') console.error('Supabase load error:', r.reason);
+    });
+  };
+
+  // Runs a write against Supabase. On failure, tell the user and reload the
+  // server state so optimistic UI changes are rolled back.
+  const runWrite = async (action: string, op: () => Promise<unknown>) => {
     try {
-      const [
-        rolesData,
-        usersData,
-        clientsData,
-        contractsData,
-        invoicesData,
-        paymentsData,
-        expensesData,
-        capitalData,
-        equityData,
-        ipData,
-        assetsData,
-        debtsData,
-        taxesData,
-        docsData,
-        tasksData,
-        profileData
-      ] = await Promise.allSettled([
-        api.fetchRolesApi(),
-        api.fetchUsersApi(),
-        api.fetchClientsApi(),
-        api.fetchContractsApi(),
-        api.fetchInvoicesApi(),
-        api.fetchPaymentsApi(),
-        api.fetchExpensesApi(),
-        api.fetchCapitalContributionsApi(),
-        api.fetchEquityApi(),
-        api.fetchIpRegistryApi(),
-        api.fetchAssetsApi(),
-        api.fetchDebtsApi(),
-        api.fetchTaxFilingsApi(),
-        api.fetchDocumentsApi(),
-        api.fetchTasksApi(),
-        api.fetchAgencyProfileApi()
-      ]);
-
-      if (rolesData.status === 'fulfilled') setCustomRoles(rolesData.value);
-      if (contractsData.status === 'fulfilled') setContracts(contractsData.value);
-      if (invoicesData.status === 'fulfilled') setInvoices(invoicesData.value);
-      if (paymentsData.status === 'fulfilled') setPayments(paymentsData.value);
-      if (expensesData.status === 'fulfilled') setExpenses(expensesData.value);
-      if (capitalData.status === 'fulfilled') setCapitalContributions(capitalData.value);
-      if (equityData.status === 'fulfilled') setPartnerEquity(equityData.value);
-      if (ipData.status === 'fulfilled') setIpRecords(ipData.value);
-      if (assetsData.status === 'fulfilled') setAssets(assetsData.value);
-      if (debtsData.status === 'fulfilled') setDebts(debtsData.value);
-      if (taxesData.status === 'fulfilled') setTaxFilings(taxesData.value);
-
-      if (profileData.status === 'fulfilled' && profileData.value) {
-        setAgencyProfileState(profileData.value);
-      }
-
-      if (usersData.status === 'fulfilled' && Array.isArray(usersData.value)) {
-        setFreelancers(usersData.value as any);
-      } else {
-        setFreelancers(getStoredFreelancers());
-      }
-
-      if (clientsData.status === 'fulfilled' && Array.isArray(clientsData.value)) {
-        setClients(clientsData.value as any);
-      } else {
-        setClients(getStoredClients());
-      }
-
-      if (tasksData.status === 'fulfilled' && Array.isArray(tasksData.value)) {
-        setTasks(tasksData.value as any);
-      } else {
-        setTasks(getStoredTasks());
-      }
-
-      if (docsData.status === 'fulfilled' && Array.isArray(docsData.value)) {
-        setSavedDocuments(docsData.value);
-      } else {
-        setSavedDocuments(getSavedDocuments());
-      }
-    } catch (e) {
-      console.warn('API sync warning, using local fallback:', e);
-      setFreelancers(getStoredFreelancers());
-      setTasks(getStoredTasks());
-      setClients(getStoredClients());
-      setSavedDocuments(getSavedDocuments());
+      await op();
+    } catch (err) {
+      reportError(action, err);
+      await refreshAllApiData();
     }
   };
 
+  // Restore an existing Supabase session on load.
   useEffect(() => {
-    refreshAllApiData();
+    if (!supabase) {
+      setAuthLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const session = data.session;
+        if (!session) return;
+        const resolved = await resolveAuthUser(session.user.id);
+        if (!resolved.user || resolved.mustChangePassword) {
+          // Unlinked account, or a temporary-password session that never
+          // finished the password change: require a fresh sign in.
+          await supabase.auth.signOut();
+          return;
+        }
+        if (!cancelled) {
+          setCurrentUser(resolved.user);
+          setCurrentView(landingViewFor(resolved.user));
+        }
+      } catch (err) {
+        console.error('Session restore failed:', err);
+      } finally {
+        if (!cancelled) setAuthLoading(false);
+      }
+    })();
+
+    // Do not call Supabase inside this callback (supabase-js deadlocks).
+    const { data: listener } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
+        pendingPasswordChange.current = false;
+        clearAllState();
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
+  useEffect(() => {
+    if (currentUser?.id) {
+      refreshAllApiData();
+    }
+  }, [currentUser?.id]);
+
   const refreshDocs = () => {
-    const docs = getSavedDocuments();
-    setSavedDocuments(docs);
+    api.fetchDocumentsApi()
+      .then(setSavedDocuments)
+      .catch(err => console.error('Reload documents failed:', err));
   };
 
-  const refreshFreelancersAndTasks = () => {
-    const fList = getStoredFreelancers();
-    const tList = getStoredTasks();
-    const cList = getStoredClients();
-    setFreelancers(fList);
-    setTasks(tList);
-    setClients(cList);
-  };
-
-  const currentClient: ClientAccount | null = 
-    currentUser?.accessLevel === 'client' 
-      ? (clients.find(c => c.id === currentUser.clientId) || clients[0] || null)
+  const currentClient: ClientAccount | null =
+    currentUser?.accessLevel === 'client'
+      ? (clients.find(c => c.id === currentUser.clientId) || null)
       : null;
 
   const updateAgencyProfile = (profile: AgencyProfile) => {
     setAgencyProfileState(profile);
-    saveAgencyProfile(profile);
-    api.updateAgencyProfileApi(profile).catch(() => {});
+    runWrite('Saving agency profile', () => api.updateAgencyProfileApi(profile));
   };
 
   const storedSignatures: StoredSignature[] = agencyProfile.signatureStore && agencyProfile.signatureStore.length > 0
@@ -496,10 +561,10 @@ export const AgencyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       id: `sig-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
       createdAt: new Date().toISOString()
     };
-    const currentList = agencyProfile.signatureStore && agencyProfile.signatureStore.length > 0 
-      ? agencyProfile.signatureStore 
+    const currentList = agencyProfile.signatureStore && agencyProfile.signatureStore.length > 0
+      ? agencyProfile.signatureStore
       : defaultSignatureStore;
-    
+
     let updatedList: StoredSignature[];
     if (newSig.isDefault) {
       updatedList = currentList.map(s => ({ ...s, isDefault: false }));
@@ -530,8 +595,8 @@ export const AgencyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const updateStoredSignature = (id: string, partial: Partial<StoredSignature>) => {
-    const currentList = agencyProfile.signatureStore && agencyProfile.signatureStore.length > 0 
-      ? agencyProfile.signatureStore 
+    const currentList = agencyProfile.signatureStore && agencyProfile.signatureStore.length > 0
+      ? agencyProfile.signatureStore
       : defaultSignatureStore;
     const updatedList = currentList.map(s => {
       if (s.id === id) {
@@ -565,8 +630,8 @@ export const AgencyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const deleteStoredSignature = (id: string) => {
-    const currentList = agencyProfile.signatureStore && agencyProfile.signatureStore.length > 0 
-      ? agencyProfile.signatureStore 
+    const currentList = agencyProfile.signatureStore && agencyProfile.signatureStore.length > 0
+      ? agencyProfile.signatureStore
       : defaultSignatureStore;
     if (currentList.length <= 1) {
       alert('Cannot delete the last remaining signature from store.');
@@ -597,8 +662,8 @@ export const AgencyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const setDefaultSignature = (id: string) => {
-    const currentList = agencyProfile.signatureStore && agencyProfile.signatureStore.length > 0 
-      ? agencyProfile.signatureStore 
+    const currentList = agencyProfile.signatureStore && agencyProfile.signatureStore.length > 0
+      ? agencyProfile.signatureStore
       : defaultSignatureStore;
     const updatedList = currentList.map(s => ({
       ...s,
@@ -623,224 +688,81 @@ export const AgencyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     updateAgencyProfile(updatedProfile);
   };
 
-  // Switch identity tester for Subhadip, Shayan, Rohan, Ananya, Vikram, Priyanka, Kavita
-  const switchTestUser = (userId: string) => {
-    if (userId === 'usr-subhadip') {
-      setCurrentUser(defaultSubhadipPartner);
-      localStorage.setItem('agency_active_auth_user', JSON.stringify(defaultSubhadipPartner));
-      return;
-    } else if (userId === 'usr-shayan') {
-      setCurrentUser(defaultShayanPartner);
-      localStorage.setItem('agency_active_auth_user', JSON.stringify(defaultShayanPartner));
-      return;
-    }
-
-    const foundUser = freelancers.find(f => f.id === userId);
-    if (foundUser) {
-      const newUser: AuthUser = {
-        id: foundUser.id,
-        name: foundUser.name,
-        email: foundUser.email,
-        role: foundUser.role,
-        roleName: (foundUser as any).roleName || foundUser.role.toLowerCase(),
-        roleLevel: (foundUser as any).roleLevel || 40,
-        accessLevel: foundUser.accessLevel,
-        isOwner: (foundUser as any).roleLevel === 100,
-        avatarUrl: foundUser.avatarUrl,
-        freelancerId: foundUser.id
-      };
-      setCurrentUser(newUser);
-      localStorage.setItem('agency_active_auth_user', JSON.stringify(newUser));
-      return;
-    }
-  };
-
   // Auth methods
-  const login = (creds: LoginCredentials): LoginResult => {
-    const identifier = creds.emailOrUsername.toLowerCase().trim();
-    const password = creds.password.trim();
-
-    // 1. Check Senior Managing Partner: Subhadip Jana
-    const subhadipUserRecord = freelancers.find(f => f.id === 'usr-subhadip');
-    const subhadipDbEmail = subhadipUserRecord?.email?.toLowerCase();
-    const subhadipDbUsername = subhadipUserRecord?.credentials?.username?.toLowerCase() || (subhadipUserRecord as any)?.username?.toLowerCase();
-    const subhadipDbPass = subhadipUserRecord?.credentials?.password || (subhadipUserRecord as any)?.password;
-
-    const isSubhadipIdentifier = 
-      identifier === 'subhadip866' || 
-      identifier === 'subhadipjana866@gmail.com' ||
-      (subhadipDbEmail && identifier === subhadipDbEmail) ||
-      (subhadipDbUsername && identifier === subhadipDbUsername);
-
-    const isSubhadipPass = 
-      password === 'subhadip2003#' ||
-      (subhadipDbPass && password === subhadipDbPass);
-
-    if (isSubhadipIdentifier && isSubhadipPass) {
-      const activeUser: AuthUser = {
-        id: 'usr-subhadip',
-        name: subhadipUserRecord?.name || 'Subhadip Jana',
-        email: subhadipUserRecord?.email || 'subhadipjana866@gmail.com',
-        username: subhadipDbUsername || 'subhadip866',
-        role: 'Senior Managing Partner',
-        roleName: 'partner',
-        roleLevel: 100,
-        accessLevel: 'admin',
-        isOwner: true,
-        avatarUrl: subhadipUserRecord?.avatarUrl || defaultSubhadipPartner.avatarUrl
-      };
-      setCurrentUser(activeUser);
-      localStorage.setItem('agency_active_auth_user', JSON.stringify(activeUser));
-      setLoginModalOpen(false);
-      setCurrentView('partnership_hub');
-      return { success: true };
-    }
-
-    // 2. Check Senior Managing Partner: Shayan Das
-    const shayanUserRecord = freelancers.find(f => f.id === 'usr-shayan');
-    const shayanDbEmail = shayanUserRecord?.email?.toLowerCase();
-    const shayanDbUsername = shayanUserRecord?.credentials?.username?.toLowerCase() || (shayanUserRecord as any)?.username?.toLowerCase();
-    const shayanDbPass = shayanUserRecord?.credentials?.password || (shayanUserRecord as any)?.password;
-
-    const isShayanIdentifier = 
-      identifier === 'shayan267' || 
-      identifier === 'shayandas267@gmail.com' ||
-      (shayanDbEmail && identifier === shayanDbEmail) ||
-      (shayanDbUsername && identifier === shayanDbUsername);
-
-    const isShayanPass = 
-      password === 'shayan2003#' ||
-      (shayanDbPass && password === shayanDbPass);
-
-    if (isShayanIdentifier && isShayanPass) {
-      const activeUser: AuthUser = {
-        id: 'usr-shayan',
-        name: shayanUserRecord?.name || 'Shayan Das',
-        email: shayanUserRecord?.email || 'shayandas267@gmail.com',
-        username: shayanDbUsername || 'shayan267',
-        role: 'Senior Managing Partner',
-        roleName: 'partner',
-        roleLevel: 100,
-        accessLevel: 'admin',
-        isOwner: true,
-        avatarUrl: shayanUserRecord?.avatarUrl || defaultShayanPartner.avatarUrl
-      };
-      setCurrentUser(activeUser);
-      localStorage.setItem('agency_active_auth_user', JSON.stringify(activeUser));
-      setLoginModalOpen(false);
-      setCurrentView('partnership_hub');
-      return { success: true };
-    }
-
-    // 3. Check Clients
-    const cls = getStoredClients();
-    const clientMatch = cls.find(
-      (c) =>
-        c.email.toLowerCase() === identifier ||
-        c.credentials.username.toLowerCase() === identifier
-    );
-
-    if (clientMatch) {
-      const isClientMatch =
-        (clientMatch.credentials.password && password === clientMatch.credentials.password) ||
-        (clientMatch.credentials.temporaryPassword && password === clientMatch.credentials.temporaryPassword) ||
-        password === 'client123' ||
-        password === 'AeroSync!2026';
-
-      if (isClientMatch) {
-        if (clientMatch.credentials.mustChangePassword) {
-          return {
-            success: false,
-            mustChangePassword: true,
-            freelancerId: clientMatch.id,
-            freelancerName: `${clientMatch.contactName} (${clientMatch.companyName})`
-          };
-        }
-
-        const clientUser: AuthUser = {
-          id: clientMatch.id,
-          name: clientMatch.contactName,
-          email: clientMatch.email,
-          role: `${clientMatch.contactTitle}`,
-          roleLevel: 10,
-          accessLevel: 'client',
-          isOwner: false,
-          clientId: clientMatch.id,
-          clientCompanyName: clientMatch.companyName
-        };
-        setCurrentUser(clientUser);
-        localStorage.setItem('agency_active_auth_user', JSON.stringify(clientUser));
-        setLoginModalOpen(false);
-        setCurrentView('client_portal');
-        return { success: true };
-      }
-    }
-
-    // 4. Check Other Team Members
-    const fls = getStoredFreelancers();
-    const match = fls.find(
-      (f) =>
-        f.email.toLowerCase() === identifier ||
-        f.credentials.username.toLowerCase() === identifier
-    );
-
-    if (match) {
-      const isTempMatch = match.credentials.temporaryPassword && password === match.credentials.temporaryPassword;
-      const isPermMatch = match.credentials.password && password === match.credentials.password;
-
-      if (isTempMatch || isPermMatch) {
-        if (match.credentials.mustChangePassword) {
-          return {
-            success: false,
-            mustChangePassword: true,
-            freelancerId: match.id,
-            freelancerName: match.name
-          };
-        }
-
-        const roleLvl = (match as any).roleLevel || 
-          (match.accessLevel === 'admin' ? 80 : match.accessLevel === 'project_lead' ? 60 : 40);
-
-        const authedUser: AuthUser = {
-          id: match.id,
-          name: match.name,
-          email: match.email,
-          role: match.role,
-          roleLevel: roleLvl,
-          accessLevel: match.accessLevel,
-          isOwner: roleLvl === 100,
-          freelancerId: match.id
-        };
-        setCurrentUser(authedUser);
-        localStorage.setItem('agency_active_auth_user', JSON.stringify(authedUser));
-        setLoginModalOpen(false);
-
-        if (match.accessLevel === 'contributor' || match.accessLevel === 'restricted') {
-          setCurrentView('my_workspace');
-        } else {
-          setCurrentView('partnership_hub');
-        }
-        return { success: true };
-      }
-    }
-
-    return { 
-      success: false, 
-      error: 'Invalid username/email or password. Please verify your credentials.' 
+  const login = async (creds: LoginCredentials): Promise<LoginResult> => {
+    const invalid: LoginResult = {
+      success: false,
+      error: 'Invalid username/email or password. Please verify your credentials.'
     };
+
+    try {
+      const client = requireSupabase();
+      const identifier = creds.emailOrUsername.trim();
+      const email = await api.resolveLoginEmail(identifier);
+      if (!email) return invalid;
+
+      const { data, error } = await client.auth.signInWithPassword({ email, password: creds.password });
+      if (error || !data.user) return invalid;
+
+      const resolved = await resolveAuthUser(data.user.id);
+      if (!resolved.user) {
+        await client.auth.signOut();
+        return {
+          success: false,
+          error: 'This login is not linked to an active team member or client account.'
+        };
+      }
+
+      if (resolved.mustChangePassword) {
+        pendingPasswordChange.current = true;
+        setCurrentUser(null);
+        return {
+          success: false,
+          mustChangePassword: true,
+          freelancerId: resolved.rowId,
+          freelancerName: resolved.displayName
+        };
+      }
+
+      pendingPasswordChange.current = false;
+      api.recordLoginApi().catch(err => console.error('Record login failed:', err));
+      setCurrentUser(resolved.user);
+      setLoginModalOpen(false);
+      setCurrentView(landingViewFor(resolved.user));
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: errorMessage(err) };
+    }
   };
 
-  const completeFirstTimePasswordChange = (freelancerId: string, newPassword: string): boolean => {
-    const success = changeFreelancerPassword(freelancerId, newPassword);
-    if (!success) return false;
-    refreshFreelancersAndTasks();
-    return true;
+  const completeFirstTimePasswordChange = async (_freelancerId: string, newPassword: string): Promise<boolean> => {
+    try {
+      const client = requireSupabase();
+      if (!pendingPasswordChange.current) return false;
+
+      const { data, error } = await client.auth.updateUser({ password: newPassword });
+      if (error || !data.user) throw error || new Error('No active session');
+      await api.completePasswordChangeApi();
+
+      const resolved = await resolveAuthUser(data.user.id);
+      if (!resolved.user) return false;
+
+      pendingPasswordChange.current = false;
+      setCurrentUser(resolved.user);
+      setLoginModalOpen(false);
+      setCurrentView(landingViewFor(resolved.user));
+      return true;
+    } catch (err) {
+      console.error('Password change failed:', err);
+      return false;
+    }
   };
 
   const logout = () => {
-    setCurrentUser(null);
-    localStorage.removeItem('agency_active_auth_user');
+    pendingPasswordChange.current = false;
+    clearAllState();
     setCurrentView('partnership_hub');
+    supabase?.auth.signOut().catch(err => console.error('Sign out failed:', err));
   };
 
   const updateAccountCredentials = async (data: {
@@ -848,101 +770,71 @@ export const AgencyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     password?: string;
     username?: string;
     name?: string;
-  }): Promise<{ success: boolean; error?: string }> => {
+  }): Promise<{ success: boolean; error?: string; notice?: string }> => {
     if (!currentUser) return { success: false, error: 'No active user session found.' };
 
     try {
-      const targetId = currentUser.id;
-      const updatedEmail = data.email?.trim() || currentUser.email;
-      const updatedUsername = data.username?.trim() || currentUser.username;
+      const client = requireSupabase();
       const updatedName = data.name?.trim() || currentUser.name;
+      const updatedUsername = data.username?.trim().toLowerCase() || currentUser.username || '';
+      const requestedEmail = data.email?.trim();
+      const emailChanged = Boolean(requestedEmail && requestedEmail.toLowerCase() !== currentUser.email.toLowerCase());
 
-      // 1. Update current authenticated user in memory & localStorage
-      const updatedAuthUser: AuthUser = {
-        ...currentUser,
-        email: updatedEmail,
-        name: updatedName,
-        username: updatedUsername
-      };
-      setCurrentUser(updatedAuthUser);
-      localStorage.setItem('agency_active_auth_user', JSON.stringify(updatedAuthUser));
+      if (data.password) {
+        const { error } = await client.auth.updateUser({ password: data.password });
+        if (error) throw error;
+      }
 
-      // 2. Update freelancers state & local storage
-      const updatedFreelancers = freelancers.map(f => {
-        if (f.id === targetId) {
-          return {
-            ...f,
-            name: updatedName,
-            email: updatedEmail,
-            credentials: {
-              ...f.credentials,
-              username: updatedUsername || f.credentials?.username || '',
-              ...(data.password ? { password: data.password } : {})
-            },
-            ...(data.password ? { password: data.password } : {}),
-            username: updatedUsername || (f as any).username
-          };
+      if (updatedName !== currentUser.name || updatedUsername !== (currentUser.username || '')) {
+        await api.updateOwnAccountApi(updatedName, updatedUsername);
+      }
+
+      // Supabase sends a confirmation link; the stored email updates after it is confirmed.
+      if (emailChanged && requestedEmail) {
+        const { error } = await client.auth.updateUser({ email: requestedEmail });
+        if (error) throw error;
+      }
+
+      setCurrentUser({ ...currentUser, name: updatedName, username: updatedUsername });
+
+      if (currentUser.roleLevel === 100 && updatedName !== currentUser.name) {
+        await api.updateEquityApi(currentUser.id, { partnerName: updatedName as PartnerEquityRecord['partnerName'] });
+        if (agencyProfile.primarySigner?.email?.toLowerCase() === currentUser.email.toLowerCase()) {
+          updateAgencyProfile({ ...agencyProfile, primarySigner: { ...agencyProfile.primarySigner, name: updatedName } });
         }
-        return f;
-      });
-      setFreelancers(updatedFreelancers);
-      localStorage.setItem('agency_freelancers', JSON.stringify(updatedFreelancers));
+      }
 
-      // 3. Persist to database via api.updateUserApi
-      const payload: any = {
-        name: updatedName,
-        email: updatedEmail,
+      await refreshAllApiData();
+      return {
+        success: true,
+        notice: emailChanged
+          ? `Saved. Confirm the new email address through the link sent to ${requestedEmail}; the old email keeps working until then.`
+          : undefined
       };
-      if (updatedUsername) payload.username = updatedUsername;
-      if (data.password) payload.password = data.password;
-
-      await api.updateUserApi(targetId, payload, currentUser.roleLevel || 100).catch(err => {
-        console.warn('Could not sync user credentials to database:', err.message);
-      });
-
-      // 4. Update Partner Equity designation and email if partner
-      if (currentUser.roleLevel === 100) {
-        setPartnerEquity(prev => prev.map(p => 
-          p.partnerId === targetId ? { ...p, partnerName: updatedName as any, email: updatedEmail, designation: 'Senior Managing Partner' } : p
-        ));
-        api.updateEquityApi(targetId, { partnerName: updatedName as any, email: updatedEmail, designation: 'Senior Managing Partner' }).catch(() => {});
-      }
-
-      // 5. Update agency profile primary signer if relevant
-      if (agencyProfile.primarySigner && (agencyProfile.primarySigner.email === currentUser.email || targetId === 'usr-subhadip')) {
-        const newSigner = { ...agencyProfile.primarySigner, name: updatedName, email: updatedEmail, title: 'Senior Managing Partner' };
-        updateAgencyProfile({ ...agencyProfile, primarySigner: newSigner });
-      }
-
-      return { success: true };
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error updating account credentials:', err);
-      return { success: false, error: err.message || 'Failed to update credentials' };
+      return { success: false, error: errorMessage(err) || 'Failed to update credentials' };
     }
   };
 
-  const switchUser = (targetId: string) => {
-    switchTestUser(targetId);
-  };
-
-  // Hierarchy validation rules
+  // Hierarchy validation rules (also enforced by Supabase RLS policies)
   // Rule 1: Users having same roles can't change or update same roles or higher than them
   const canModifyUser = (targetRoleLevel: number): boolean => {
     if (!currentUser) return false;
-    const actorLvl = currentUser.roleLevel || 100;
+    const actorLvl = currentUser.roleLevel ?? 0;
     return actorLvl > targetRoleLevel;
   };
 
   // Rule 2: Role giving permission is only available to partners, admins and managers
   const canAssignRole = (roleLevel: number): boolean => {
     if (!currentUser) return false;
-    const actorLvl = currentUser.roleLevel || 100;
+    const actorLvl = currentUser.roleLevel ?? 0;
     if (actorLvl < 60) return false; // Strictly Partner (100), Admin (80), Manager (60)
     return actorLvl > roleLevel;
   };
 
   // Team management with hierarchy checks
-  const addNewFreelancer = (data: {
+  const addNewFreelancer = async (data: {
     name: string;
     email: string;
     role: string;
@@ -953,24 +845,20 @@ export const AgencyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     skills: string[];
     notes?: string;
     roleLevel?: number;
-  }): Freelancer => {
+  }): Promise<Freelancer> => {
     const targetLvl = data.roleLevel || (data.accessLevel === 'admin' ? 80 : data.accessLevel === 'project_lead' ? 60 : 40);
-    const actorLvl = currentUser?.roleLevel || 100;
+    const actorLvl = currentUser?.roleLevel ?? 0;
 
     if (!canAssignRole(targetLvl)) {
-      alert(`Hierarchy Violation: As a Level ${actorLvl} user, you cannot create or assign a role at Level ${targetLvl}. You may only assign roles strictly below your level.`);
-      throw new Error('Hierarchy violation');
+      throw new Error(`Hierarchy Violation: As a Level ${actorLvl} user, you cannot create or assign a role at Level ${targetLvl}. You may only assign roles strictly below your level.`);
     }
 
-    const id = `usr-${Date.now()}`;
-    const username = generateUsername(data.name, data.email);
-    const temporaryPassword = generateSecureTemporaryPassword();
-
     const newFreelancer: Freelancer = {
-      id,
+      id: `usr-${Date.now()}`,
       name: data.name,
-      email: data.email,
+      email: data.email.trim().toLowerCase(),
       role: data.role,
+      roleLevel: targetLvl,
       accessLevel: data.accessLevel,
       paymentType: data.paymentType,
       paymentAmount: data.paymentAmount,
@@ -980,60 +868,79 @@ export const AgencyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       skills: data.skills,
       joinedDate: new Date().toISOString().split('T')[0],
       credentials: {
-        username,
-        temporaryPassword,
+        username: generateUsername(data.name, data.email),
         mustChangePassword: true,
         generatedAt: new Date().toISOString()
       },
       notes: data.notes
     };
 
-    const saved = saveFreelancer(newFreelancer);
-    refreshFreelancersAndTasks();
-    api.createUserApi(newFreelancer, actorLvl).catch(() => {});
-    return saved;
+    await api.createUserApi(newFreelancer);
+    let temporaryPassword: string;
+    try {
+      temporaryPassword = await api.provisionLoginApi('user', newFreelancer.id);
+    } catch (err) {
+      await refreshAllApiData();
+      throw new Error(`${newFreelancer.name} was saved, but their login could not be created. Use "Reset Temp Pwd" after fixing this.\n\n${errorMessage(err)}`);
+    }
+
+    const created: Freelancer = {
+      ...newFreelancer,
+      hasLogin: true,
+      credentials: { ...newFreelancer.credentials, temporaryPassword }
+    };
+    setFreelancers(prev => [created, ...prev.filter(f => f.id !== created.id)]);
+    return created;
   };
 
-  const updateFreelancerItem = (freelancer: Freelancer) => {
-    const targetLvl = (freelancer as any).roleLevel || 40;
-    const actorLvl = currentUser?.roleLevel || 100;
+  const updateFreelancerItem = async (freelancer: Freelancer) => {
+    const targetLvl = freelancer.roleLevel ?? 40;
+    const actorLvl = currentUser?.roleLevel ?? 0;
 
     if (!canModifyUser(targetLvl)) {
       alert(`Hierarchy Violation: As Level ${actorLvl}, you cannot update a user at Level ${targetLvl} (same role or higher).`);
       return;
     }
 
-    saveFreelancer(freelancer);
-    refreshFreelancersAndTasks();
-    api.updateUserApi(freelancer.id, freelancer, actorLvl).catch(() => {});
+    setFreelancers(prev => prev.map(f => f.id === freelancer.id ? freelancer : f));
+    await runWrite('Updating team member', () => api.updateUserApi(freelancer));
   };
 
-  const removeFreelancer = (id: string) => {
+  const removeFreelancer = async (id: string) => {
     const target = freelancers.find(f => f.id === id);
-    const targetLvl = (target as any)?.roleLevel || 40;
-    const actorLvl = currentUser?.roleLevel || 100;
+    const targetLvl = target?.roleLevel ?? 40;
 
     if (!canModifyUser(targetLvl)) {
       alert(`Hierarchy Violation: You cannot delete a user at Level ${targetLvl} (same role or higher).`);
       return;
     }
 
-    deleteFreelancer(id);
-    refreshFreelancersAndTasks();
-    api.deleteUserApi(id, actorLvl).catch(() => {});
+    await runWrite('Removing team member', async () => {
+      await api.deleteAccountApi('user', id);
+      setFreelancers(prev => prev.filter(f => f.id !== id));
+    });
   };
 
-  const regeneratePassword = (id: string) => {
-    const res = resetFreelancerPassword(id);
-    refreshFreelancersAndTasks();
-    return res;
+  const regeneratePassword = async (id: string) => {
+    try {
+      const newPassword = await api.provisionLoginApi('user', id);
+      const existing = freelancers.find(f => f.id === id);
+      const updated: Freelancer | null = existing ? {
+        ...existing,
+        hasLogin: true,
+        credentials: { ...existing.credentials, temporaryPassword: newPassword, mustChangePassword: true, generatedAt: new Date().toISOString() }
+      } : null;
+      if (updated) setFreelancers(prev => prev.map(f => f.id === id ? updated : f));
+      return { newPassword, freelancer: updated };
+    } catch (err) {
+      reportError('Issuing temporary password', err);
+      return { newPassword: '', freelancer: null };
+    }
   };
 
   // Client Management
-  const addNewClient = (data: any): ClientAccount => {
+  const addNewClient = async (data: Parameters<AgencyContextType['addNewClient']>[0]): Promise<ClientAccount> => {
     const id = `client-${Date.now()}`;
-    const username = generateUsername(data.contactName, data.email);
-    const temporaryPassword = generateSecureTemporaryPassword();
     const lead = freelancers.find((f) => f.id === data.projectLeadId);
 
     const newClient: ClientAccount = {
@@ -1041,12 +948,11 @@ export const AgencyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       companyName: data.companyName,
       contactName: data.contactName,
       contactTitle: data.contactTitle,
-      email: data.email,
+      email: data.email.trim().toLowerCase(),
       phone: data.phone,
       address: data.address,
       credentials: {
-        username,
-        temporaryPassword,
+        username: generateUsername(data.contactName, data.email),
         mustChangePassword: true,
         generatedAt: new Date().toISOString()
       },
@@ -1067,7 +973,7 @@ export const AgencyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           communicationChannels: {
             slackChannel: `#${data.companyName.toLowerCase().replace(/[^a-z0-9]/g, '')}-sync`,
             meetingSchedule: 'Weekly Sprint Sync — Thursdays 10:00 AM EST',
-            contactEmail: data.contactEmail || agencyProfile.email
+            contactEmail: data.communicationChannels?.contactEmail || agencyProfile.email
           },
           milestones: []
         }
@@ -1076,71 +982,103 @@ export const AgencyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       createdAt: new Date().toISOString()
     };
 
-    const saved = saveClient(newClient);
-    refreshFreelancersAndTasks();
-    api.createClientApi(newClient).catch(() => {});
-    return saved;
-  };
-
-  const removeClientItem = (id: string) => {
-    deleteClient(id);
-    refreshFreelancersAndTasks();
-  };
-
-  const regenerateClientCredentials = (id: string) => {
-    const res = resetClientPassword(id);
-    refreshFreelancersAndTasks();
-    return res;
-  };
-
-  const sendDocumentToClient = (docId: string, clientId: string, notes?: string): boolean => {
-    const targetClient = clients.find((c) => c.id === clientId);
-    if (!targetClient) return false;
-    shareDocumentWithClient(clientId, docId);
-
-    const allDocs = getSavedDocuments();
-    const doc = allDocs.find((d) => d.id === docId);
-    if (doc) {
-      const updatedDoc: SavedDocument = {
-        ...doc,
-        clientId,
-        clientName: targetClient.companyName,
-        status: doc.status === 'draft' ? 'issued' : doc.status,
-        sharedWithClient: true,
-        sharedAt: new Date().toISOString(),
-        clientNotes: notes !== undefined ? notes : doc.clientNotes
-      };
-      saveDocument(updatedDoc);
-      api.saveDocumentApi(updatedDoc).catch(() => {});
-      if (editingDocument?.id === docId) {
-        setEditingDocument(updatedDoc);
-      }
+    await api.createClientApi(newClient);
+    let temporaryPassword: string;
+    try {
+      temporaryPassword = await api.provisionLoginApi('client', id);
+    } catch (err) {
+      await refreshAllApiData();
+      throw new Error(`${newClient.companyName} was saved, but the portal login could not be created. Use "Reset Temp Pwd" after fixing this.\n\n${errorMessage(err)}`);
     }
 
-    refreshDocs();
-    refreshFreelancersAndTasks();
+    const created: ClientAccount = {
+      ...newClient,
+      hasLogin: true,
+      credentials: { ...newClient.credentials, temporaryPassword }
+    };
+    setClients(prev => [created, ...prev.filter(c => c.id !== id)]);
+    return created;
+  };
+
+  const removeClientItem = async (id: string) => {
+    await runWrite('Removing client', async () => {
+      await api.deleteAccountApi('client', id);
+      setClients(prev => prev.filter(c => c.id !== id));
+    });
+  };
+
+  const regenerateClientCredentials = async (id: string) => {
+    try {
+      const newPassword = await api.provisionLoginApi('client', id);
+      const existing = clients.find(c => c.id === id);
+      const updated: ClientAccount | null = existing ? {
+        ...existing,
+        hasLogin: true,
+        credentials: { ...existing.credentials, temporaryPassword: newPassword, mustChangePassword: true, generatedAt: new Date().toISOString() }
+      } : null;
+      if (updated) setClients(prev => prev.map(c => c.id === id ? updated : c));
+      return { newPassword, client: updated };
+    } catch (err) {
+      reportError('Issuing client temporary password', err);
+      return { newPassword: '', client: null };
+    }
+  };
+
+  const sendDocumentToClient = async (docId: string, clientId: string, notes?: string): Promise<boolean> => {
+    const targetClient = clients.find((c) => c.id === clientId);
+    const doc = savedDocuments.find((d) => d.id === docId);
+    if (!targetClient || !doc) return false;
+
+    const sharedDocumentIds = Array.from(new Set([...(targetClient.sharedDocumentIds || []), docId]));
+    const updatedDoc: SavedDocument = {
+      ...doc,
+      clientId,
+      clientName: targetClient.companyName,
+      status: doc.status === 'draft' ? 'issued' : doc.status,
+      sharedWithClient: true,
+      sharedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      clientNotes: notes !== undefined ? notes : doc.clientNotes
+    };
+
+    try {
+      await api.saveDocumentApi(updatedDoc);
+      await api.updateClientApi(clientId, { sharedDocumentIds });
+    } catch (err) {
+      reportError('Sharing document', err);
+      await refreshAllApiData();
+      return false;
+    }
+
+    setSavedDocuments(prev => prev.map(d => d.id === docId ? updatedDoc : d));
+    setClients(prev => prev.map(c => c.id === clientId ? { ...c, sharedDocumentIds } : c));
+    if (editingDocument?.id === docId) {
+      setEditingDocument(updatedDoc);
+    }
     return true;
   };
 
-  const unshareDocumentFromClient = (docId: string, clientId: string): boolean => {
-    unshareDocumentWithClient(clientId, docId);
-    const allDocs = getSavedDocuments();
-    const doc = allDocs.find((d) => d.id === docId);
-    if (doc) {
-      const updatedDoc: SavedDocument = {
-        ...doc,
-        sharedWithClient: false
-      };
-      saveDocument(updatedDoc);
-      api.saveDocumentApi(updatedDoc).catch(() => {});
+  const unshareDocumentFromClient = async (docId: string, clientId: string): Promise<boolean> => {
+    const targetClient = clients.find((c) => c.id === clientId);
+    const doc = savedDocuments.find((d) => d.id === docId);
+    const sharedDocumentIds = (targetClient?.sharedDocumentIds || []).filter(id => id !== docId);
+
+    try {
+      if (targetClient) await api.updateClientApi(clientId, { sharedDocumentIds });
+      if (doc) await api.saveDocumentApi({ ...doc, sharedWithClient: false, updatedAt: new Date().toISOString() });
+    } catch (err) {
+      reportError('Unsharing document', err);
+      await refreshAllApiData();
+      return false;
     }
-    refreshDocs();
-    refreshFreelancersAndTasks();
+
+    setClients(prev => prev.map(c => c.id === clientId ? { ...c, sharedDocumentIds } : c));
+    setSavedDocuments(prev => prev.map(d => d.id === docId ? { ...d, sharedWithClient: false } : d));
     return true;
   };
 
   // Task allocation
-  const allocateTask = (data: any): Task => {
+  const allocateTask = async (data: Parameters<AgencyContextType['allocateTask']>[0]): Promise<Task> => {
     const fl = freelancers.find((f) => f.id === data.freelancerId);
     const now = new Date().toISOString();
     const newTask: Task = {
@@ -1157,33 +1095,31 @@ export const AgencyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       dueDate: data.dueDate,
       createdAt: now,
       updatedAt: now,
-      estimatedHours: data.estimatedHours || 8
+      estimatedHours: data.estimatedHours || 8,
+      deliverables: []
     };
 
-    const saved = saveTask(newTask);
-    refreshFreelancersAndTasks();
-    api.createTaskApi(newTask).catch(() => {});
-    return saved;
+    setTasks(prev => [newTask, ...prev]);
+    await runWrite('Allocating task', () => api.createTaskApi(newTask));
+    return newTask;
   };
 
-  const changeTaskStatus = (taskId: string, status: TaskStatus) => {
-    updateTaskStatus(taskId, status);
-    refreshFreelancersAndTasks();
-    api.updateTaskApi(taskId, { status }).catch(() => {});
+  const changeTaskStatus = async (taskId: string, status: TaskStatus) => {
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status, updatedAt: new Date().toISOString() } : t));
+    await runWrite('Updating task status', () => api.updateTaskApi(taskId, { status }));
   };
 
-  const submitDeliverable = (taskId: string, deliverable: TaskDeliverable) => {
-    submitTaskDeliverable(taskId, deliverable);
-    refreshFreelancersAndTasks();
-    api.updateTaskApi(taskId, {
-      deliverables: [deliverable],
-      status: 'review'
-    }).catch(() => {});
+  const submitDeliverable = async (taskId: string, deliverable: TaskDeliverable) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    const deliverables = [deliverable, ...(task.deliverables || [])];
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, deliverables, status: 'review', updatedAt: new Date().toISOString() } : t));
+    await runWrite('Submitting deliverable', () => api.updateTaskApi(taskId, { deliverables, status: 'review' }));
   };
 
-  const removeTask = (taskId: string) => {
-    deleteTask(taskId);
-    refreshFreelancersAndTasks();
+  const removeTask = async (taskId: string) => {
+    setTasks(prev => prev.filter(t => t.id !== taskId));
+    await runWrite('Removing task', () => api.deleteTaskApi(taskId));
   };
 
   // 10 LEDGERS CRUD IMPLEMENTATIONS
@@ -1211,17 +1147,17 @@ export const AgencyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       updatedAt: now
     };
     setContracts(prev => [newRecord, ...prev]);
-    await api.createContractApi(newRecord);
+    await runWrite('Creating contract', () => api.createContractApi(newRecord));
   };
 
   const updateContractItem = async (id: string, contract: Partial<ClientContractRecord>) => {
     setContracts(prev => prev.map(c => c.id === id ? { ...c, ...contract, updatedAt: new Date().toISOString() } : c));
-    await api.updateContractApi(id, contract);
+    await runWrite('Updating contract', () => api.updateContractApi(id, contract));
   };
 
   const removeContractItem = async (id: string) => {
     setContracts(prev => prev.filter(c => c.id !== id));
-    await api.deleteContractApi(id);
+    await runWrite('Deleting contract', () => api.deleteContractApi(id));
   };
 
   // 2. Invoices
@@ -1249,20 +1185,20 @@ export const AgencyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       updatedAt: now
     };
     setInvoices(prev => [newRecord, ...prev]);
-    await api.createInvoiceApi(newRecord);
+    await runWrite('Creating invoice', () => api.createInvoiceApi(newRecord));
   };
 
   const updateInvoiceItem = async (id: string, invoice: Partial<InvoiceRecord>) => {
     setInvoices(prev => prev.map(i => i.id === id ? { ...i, ...invoice, updatedAt: new Date().toISOString() } : i));
-    await api.updateInvoiceApi(id, invoice);
+    await runWrite('Updating invoice', () => api.updateInvoiceApi(id, invoice));
   };
 
   const removeInvoiceItem = async (id: string) => {
     setInvoices(prev => prev.filter(i => i.id !== id));
-    await api.deleteInvoiceApi(id);
+    await runWrite('Deleting invoice', () => api.deleteInvoiceApi(id));
   };
 
-  // 3. Payments
+  // 3. Payments (a database trigger updates the linked invoice)
   const addNewPayment = async (payment: Partial<PaymentRecord>) => {
     const id = `pay-${Date.now()}`;
     const now = new Date().toISOString();
@@ -1283,15 +1219,18 @@ export const AgencyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       createdAt: now
     };
     setPayments(prev => [newRecord, ...prev]);
-    await api.createPaymentApi(newRecord);
-    // Refresh invoices to reflect updated payment status
-    const invs = await api.fetchInvoicesApi();
-    setInvoices(invs);
+    await runWrite('Recording payment', async () => {
+      await api.createPaymentApi(newRecord);
+      setInvoices(await api.fetchInvoicesApi());
+    });
   };
 
   const removePaymentItem = async (id: string) => {
     setPayments(prev => prev.filter(p => p.id !== id));
-    await api.deletePaymentApi(id);
+    await runWrite('Deleting payment', async () => {
+      await api.deletePaymentApi(id);
+      setInvoices(await api.fetchInvoicesApi());
+    });
   };
 
   // 4. Expenses
@@ -1315,15 +1254,15 @@ export const AgencyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       createdAt: now
     };
     setExpenses(prev => [newRecord, ...prev]);
-    await api.createExpenseApi(newRecord);
+    await runWrite('Recording expense', () => api.createExpenseApi(newRecord));
   };
 
   const removeExpenseItem = async (id: string) => {
     setExpenses(prev => prev.filter(e => e.id !== id));
-    await api.deleteExpenseApi(id);
+    await runWrite('Deleting expense', () => api.deleteExpenseApi(id));
   };
 
-  // 5. Capital Contributions
+  // 5. Capital Contributions (a database trigger updates partner equity)
   const addNewCapitalContribution = async (contrib: Partial<CapitalContributionRecord>) => {
     const id = `cap-${Date.now()}`;
     const now = new Date().toISOString();
@@ -1341,15 +1280,16 @@ export const AgencyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       createdAt: now
     };
     setCapitalContributions(prev => [newRecord, ...prev]);
-    await api.createCapitalContributionApi(newRecord);
-    const eq = await api.fetchEquityApi();
-    setPartnerEquity(eq);
+    await runWrite('Recording capital contribution', async () => {
+      await api.createCapitalContributionApi(newRecord);
+      setPartnerEquity(await api.fetchEquityApi());
+    });
   };
 
   // 6. Partner Equity
   const updatePartnerEquityItem = async (partnerId: string, data: Partial<PartnerEquityRecord>) => {
     setPartnerEquity(prev => prev.map(p => p.partnerId === partnerId ? { ...p, ...data, lastUpdated: new Date().toISOString() } : p));
-    await api.updateEquityApi(partnerId, data);
+    await runWrite('Updating partner equity', () => api.updateEquityApi(partnerId, data));
   };
 
   // 7. IP Registry
@@ -1372,17 +1312,17 @@ export const AgencyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       createdAt: now
     };
     setIpRecords(prev => [newRecord, ...prev]);
-    await api.createIpRecordApi(newRecord);
+    await runWrite('Registering IP record', () => api.createIpRecordApi(newRecord));
   };
 
   const updateIpRecordItem = async (id: string, record: Partial<IpOwnershipRecord>) => {
     setIpRecords(prev => prev.map(r => r.id === id ? { ...r, ...record } : r));
-    await api.updateIpRecordApi(id, record);
+    await runWrite('Updating IP record', () => api.updateIpRecordApi(id, record));
   };
 
   const removeIpRecordItem = async (id: string) => {
     setIpRecords(prev => prev.filter(r => r.id !== id));
-    await api.deleteIpRecordApi(id);
+    await runWrite('Deleting IP record', () => api.deleteIpRecordApi(id));
   };
 
   // 8. Assets
@@ -1405,17 +1345,17 @@ export const AgencyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       updatedAt: now
     };
     setAssets(prev => [newRecord, ...prev]);
-    await api.createAssetApi(newRecord);
+    await runWrite('Registering asset', () => api.createAssetApi(newRecord));
   };
 
   const updateAssetItem = async (id: string, asset: Partial<AssetRecord>) => {
     setAssets(prev => prev.map(a => a.id === id ? { ...a, ...asset, updatedAt: new Date().toISOString() } : a));
-    await api.updateAssetApi(id, asset);
+    await runWrite('Updating asset', () => api.updateAssetApi(id, asset));
   };
 
   const removeAssetItem = async (id: string) => {
     setAssets(prev => prev.filter(a => a.id !== id));
-    await api.deleteAssetApi(id);
+    await runWrite('Deleting asset', () => api.deleteAssetApi(id));
   };
 
   // 9. Debts
@@ -1440,17 +1380,17 @@ export const AgencyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       updatedAt: now
     };
     setDebts(prev => [newRecord, ...prev]);
-    await api.createDebtApi(newRecord);
+    await runWrite('Recording debt', () => api.createDebtApi(newRecord));
   };
 
   const updateDebtItem = async (id: string, debt: Partial<DebtRecord>) => {
     setDebts(prev => prev.map(d => d.id === id ? { ...d, ...debt, updatedAt: new Date().toISOString() } : d));
-    await api.updateDebtApi(id, debt);
+    await runWrite('Updating debt', () => api.updateDebtApi(id, debt));
   };
 
   const removeDebtItem = async (id: string) => {
     setDebts(prev => prev.filter(d => d.id !== id));
-    await api.deleteDebtApi(id);
+    await runWrite('Deleting debt', () => api.deleteDebtApi(id));
   };
 
   // 10. Tax Filings
@@ -1476,50 +1416,48 @@ export const AgencyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       updatedAt: now
     };
     setTaxFilings(prev => [newRecord, ...prev]);
-    await api.createTaxFilingApi(newRecord);
+    await runWrite('Recording tax filing', () => api.createTaxFilingApi(newRecord));
   };
 
   const updateTaxFilingItem = async (id: string, filing: Partial<TaxFilingRecord>) => {
     setTaxFilings(prev => prev.map(t => t.id === id ? { ...t, ...filing, updatedAt: new Date().toISOString() } : t));
-    await api.updateTaxFilingApi(id, filing);
+    await runWrite('Updating tax filing', () => api.updateTaxFilingApi(id, filing));
   };
 
   const removeTaxFilingItem = async (id: string) => {
     setTaxFilings(prev => prev.filter(t => t.id !== id));
-    await api.deleteTaxFilingApi(id);
+    await runWrite('Deleting tax filing', () => api.deleteTaxFilingApi(id));
   };
 
   // Custom Roles Creation & Hierarchy
   const addNewRole = async (role: Partial<CustomRoleDefinition>): Promise<{ success: boolean; error?: string }> => {
-    const actorLvl = currentUser?.roleLevel || 100;
+    const actorLvl = currentUser?.roleLevel ?? 0;
     if (!canAssignRole(role.level || 0)) {
-      return { 
-        success: false, 
-        error: `Hierarchy violation: As a Level ${actorLvl} user, you cannot create a role at Level ${role.level}. It must be strictly lower.` 
+      return {
+        success: false,
+        error: `Hierarchy violation: As a Level ${actorLvl} user, you cannot create a role at Level ${role.level}. It must be strictly lower.`
       };
     }
 
     try {
-      const created = await api.createRoleApi(role, actorLvl);
+      const created = await api.createRoleApi(role);
       setCustomRoles(prev => [...prev, created]);
       return { success: true };
-    } catch (err: any) {
-      return { success: false, error: err.message };
+    } catch (err) {
+      return { success: false, error: errorMessage(err) };
     }
   };
 
   const updateRoleItem = async (id: string, role: Partial<CustomRoleDefinition>): Promise<{ success: boolean; error?: string }> => {
-    const actorLvl = currentUser?.roleLevel || 100;
     try {
-      await api.updateRoleApi(id, role, actorLvl);
+      await api.updateRoleApi(id, role);
       setCustomRoles(prev => prev.map(r => r.id === id ? { ...r, ...role } : r));
       return { success: true };
-    } catch (err: any) {
-      return { success: false, error: err.message };
+    } catch (err) {
+      return { success: false, error: errorMessage(err) };
     }
   };
 
-  // Documents Helpers
   // Documents Helpers
   const createInitialPayloadForType = (type: DocumentType, docNumber?: string): DocumentPayload => {
     const prefixMap: Record<DocumentType, string> = {
@@ -1659,17 +1597,20 @@ export const AgencyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setCurrentView('library');
   };
 
+  const upsertDocumentInState = (doc: SavedDocument) => {
+    setSavedDocuments(prev => [doc, ...prev.filter(d => d.id !== doc.id)]);
+  };
+
   const saveCurrentDoc = (doc: SavedDocument) => {
-    const saved = saveDocument(doc);
+    const saved: SavedDocument = { ...doc, updatedAt: new Date().toISOString() };
     setEditingDocument(saved);
-    api.saveDocumentApi(saved).catch(() => {});
-    refreshDocs();
+    upsertDocumentInState(saved);
+    runWrite('Saving document', () => api.saveDocumentApi(saved));
   };
 
   const deleteDoc = (id: string) => {
-    deleteDocument(id);
-    api.deleteDocumentApi(id).catch(() => {});
-    refreshDocs();
+    setSavedDocuments(prev => prev.filter(d => d.id !== id));
+    runWrite('Deleting document', () => api.deleteDocumentApi(id));
     if (editingDocument?.id === id) {
       setEditingDocument(null);
       setCurrentView('library');
@@ -1677,20 +1618,40 @@ export const AgencyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const clearAllDocs = () => {
-    clearAllDocuments();
     setSavedDocuments([]);
+    runWrite('Clearing documents', () => api.deleteAllDocumentsApi());
   };
 
   const cloneDoc = (id: string) => {
-    const cloned = duplicateDocument(id);
-    refreshDocs();
-    if (cloned) {
-      openEditorForEdit(cloned);
-    }
+    const doc = savedDocuments.find(d => d.id === id);
+    if (!doc) return;
+
+    const now = new Date().toISOString();
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+    const cloned: SavedDocument = {
+      ...doc,
+      id: `doc-${Date.now()}-${randomSuffix}`,
+      title: `${doc.title} (Copy)`,
+      docNumber: `${doc.docNumber}-COPY`,
+      createdAt: now,
+      updatedAt: now,
+      status: 'draft',
+      sharedWithClient: false,
+      sharedAt: undefined
+    };
+
+    upsertDocumentInState(cloned);
+    runWrite('Duplicating document', () => api.saveDocumentApi(cloned));
+    openEditorForEdit(cloned);
   };
 
   const exportDataJson = () => {
-    const json = exportAllData();
+    const json = JSON.stringify({
+      agencyProfile,
+      documents: savedDocuments,
+      exportedAt: new Date().toISOString(),
+      version: '1.0'
+    }, null, 2);
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -1700,14 +1661,24 @@ export const AgencyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     URL.revokeObjectURL(url);
   };
 
-  const importDataJson = (json: string): boolean => {
-    const ok = importAllData(json);
-    if (ok) {
-      setAgencyProfileState(getAgencyProfile());
-      refreshDocs();
-      refreshFreelancersAndTasks();
+  // Restores a backup file into Supabase.
+  const importDataJson = async (json: string): Promise<boolean> => {
+    try {
+      const parsed = JSON.parse(json);
+      if (parsed.agencyProfile) {
+        await api.updateAgencyProfileApi(parsed.agencyProfile);
+      }
+      if (Array.isArray(parsed.documents)) {
+        for (const doc of parsed.documents as SavedDocument[]) {
+          await api.saveDocumentApi(doc);
+        }
+      }
+      await refreshAllApiData();
+      return true;
+    } catch (err) {
+      console.error('Failed to import data', err);
+      return false;
     }
-    return ok;
   };
 
   return (
@@ -1736,14 +1707,13 @@ export const AgencyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         importDataJson,
         refreshDocs,
 
+        authLoading,
         currentUser,
         isAuthenticated: !!currentUser,
         loginModalOpen,
         setLoginModalOpen,
         login,
         logout,
-        switchUser,
-        switchTestUser,
         completeFirstTimePasswordChange,
         updateAccountCredentials,
 

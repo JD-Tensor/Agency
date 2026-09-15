@@ -6,8 +6,8 @@ export type PaymentType = 'hourly' | 'fixed';
 
 export interface FreelancerCredentials {
   username: string;
+  // Only held in memory right after an admin issues it; never stored.
   temporaryPassword?: string;
-  password?: string;
   mustChangePassword?: boolean;
   generatedAt: string;
   lastLoginAt?: string;
@@ -20,6 +20,8 @@ export interface Freelancer {
   avatarUrl?: string;
   role: string; // e.g. "Senior UI/UX Designer", "Frontend Architect", "Backend Engineer"
   accessLevel: AccessLevel;
+  roleLevel?: number;
+  hasLogin?: boolean; // linked Supabase Auth account exists
   paymentType: PaymentType; // 'hourly' or 'fixed'
   paymentAmount: number; // e.g. 85 ($/hr) or 3500 (fixed)
   hourlyRate?: number; // for backward compatibility

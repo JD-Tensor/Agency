@@ -61,8 +61,8 @@ export const FreelancerDirectory: React.FC = () => {
     }
   };
 
-  const handleResetPassword = (fl: Freelancer) => {
-    const res = regeneratePassword(fl.id);
+  const handleResetPassword = async (fl: Freelancer) => {
+    const res = await regeneratePassword(fl.id);
     if (res.newPassword) {
       setActivePasswordSlip({ id: fl.id, password: res.newPassword });
     }

@@ -11,6 +11,7 @@ import {
   ShieldAlert
 } from 'lucide-react';
 import { useAgency } from '../../context/AgencyContext';
+import { isSupabaseConfigured } from '../../services/supabase';
 
 export const LoginPage: React.FC = () => {
   const { login, completeFirstTimePasswordChange } = useAgency();
@@ -28,15 +29,15 @@ export const LoginPage: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     setIsLoading(true);
 
     try {
-      const res = login({ 
-        emailOrUsername: identifier.trim(), 
-        password: password.trim() 
+      const res = await login({
+        emailOrUsername: identifier.trim(),
+        password
       });
 
       if (res.mustChangePassword && res.freelancerId) {
@@ -57,7 +58,7 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  const handlePasswordResetSubmit = (e: React.FormEvent) => {
+  const handlePasswordResetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
 
@@ -73,12 +74,12 @@ export const LoginPage: React.FC = () => {
 
     if (!pendingFreelancerId) return;
 
-    const ok = completeFirstTimePasswordChange(pendingFreelancerId, newPassword);
-    if (ok) {
-      // Re-attempt login with new password
-      login({ emailOrUsername: identifier.trim(), password: newPassword });
-    } else {
-      setErrorMsg('Failed to update password. Please try again.');
+    setIsLoading(true);
+    // On success the context signs the user in and this page unmounts.
+    const ok = await completeFirstTimePasswordChange(pendingFreelancerId, newPassword);
+    if (!ok) {
+      setIsLoading(false);
+      setErrorMsg('Failed to update password. Sign in again with your temporary password and retry.');
     }
   };
 
@@ -129,6 +130,15 @@ export const LoginPage: React.FC = () => {
                   </p>
                 </div>
 
+                {!isSupabaseConfigured() && (
+                  <div className="mb-5 p-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl text-xs flex items-start gap-2.5">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <span className="leading-snug">
+                      Database not configured. Set <code className="font-mono">VITE_SUPABASE_URL</code> and <code className="font-mono">VITE_SUPABASE_ANON_KEY</code> in <code className="font-mono">.env</code>, then restart the dev server.
+                    </span>
+                  </div>
+                )}
+
                 {/* Error Banner */}
                 {errorMsg && (
                   <div className="mb-5 p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs flex items-start gap-2.5 animate-in fade-in">
@@ -147,7 +157,7 @@ export const LoginPage: React.FC = () => {
                       type="text"
                       value={identifier}
                       onChange={(e) => setIdentifier(e.target.value)}
-                      placeholder="e.g. subhadip866 or subhadipjana866@gmail.com"
+                      placeholder="Your username or email"
                       className="w-full px-3.5 py-2.5 bg-parchment-50/60 border border-parchment-300 rounded-xl text-xs text-ink-900 placeholder:text-ink-400 focus:outline-none focus:border-clay-600 focus:bg-white focus:ring-2 focus:ring-clay-600/10 transition"
                       required
                       autoFocus

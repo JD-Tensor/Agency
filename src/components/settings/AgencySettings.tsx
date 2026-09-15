@@ -77,7 +77,7 @@ export const AgencySettings: React.FC = () => {
     if (res.success) {
       setCredMessage({ 
         type: 'success', 
-        text: 'Credentials updated successfully! Your updated email/password are now active for future logins.' 
+        text: res.notice || 'Credentials updated successfully.' 
       });
       setNewAccountPassword('');
       setConfirmAccountPassword('');
@@ -106,7 +106,7 @@ export const AgencySettings: React.FC = () => {
   const [sigPreset, setSigPreset] = useState<'subhadip' | 'shayan' | 'custom'>('subhadip');
   const [newSigName, setNewSigName] = useState('Subhadip Jana');
   const [newSigTitle, setNewSigTitle] = useState('Senior Managing Partner');
-  const [newSigEmail, setNewSigEmail] = useState('subhadipjana866@gmail.com');
+  const [newSigEmail, setNewSigEmail] = useState('subhadipjana@jdtensor.com');
   const [newSigIsDefault, setNewSigIsDefault] = useState(false);
   const [newSigMode, setNewSigMode] = useState<'upload' | 'draw'>('upload');
   const [newSigImage, setNewSigImage] = useState<string>('');
@@ -116,11 +116,11 @@ export const AgencySettings: React.FC = () => {
     if (preset === 'subhadip') {
       setNewSigName('Subhadip Jana');
       setNewSigTitle('Senior Managing Partner');
-      setNewSigEmail('subhadipjana866@gmail.com');
+      setNewSigEmail('subhadipjana@jdtensor.com');
     } else if (preset === 'shayan') {
       setNewSigName('Shayan Das');
       setNewSigTitle('Senior Managing Partner');
-      setNewSigEmail('shayandas267@gmail.com');
+      setNewSigEmail('shayandas@jdtensor.com');
     } else {
       setNewSigName('');
       setNewSigTitle('Senior Managing Partner');
@@ -313,7 +313,7 @@ export const AgencySettings: React.FC = () => {
                 required
                 value={accountEmail}
                 onChange={(e) => setAccountEmail(e.target.value)}
-                placeholder="e.g. subhadipjana866@gmail.com"
+                placeholder="e.g. subhadipjana@jdtensor.com"
                 className="w-full text-xs p-2.5 border border-parchment-300 rounded-lg focus:border-clay-600 focus:outline-none bg-parchment-50/40"
               />
               <p className="text-[10px] text-ink-400 mt-1">
