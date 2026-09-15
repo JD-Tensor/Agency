@@ -20,6 +20,7 @@ export const CapitalEquityView: React.FC = () => {
     addNewCapitalContribution, 
     updatePartnerEquityItem, 
     currentUser,
+    agencyProfile,
     activeCurrency,
     setActiveCurrency,
     formatMoney
@@ -45,12 +46,18 @@ export const CapitalEquityView: React.FC = () => {
     designation: string;
     ownershipPercentage: number;
     profitSharePercentage: number;
-    signatureImage?: string;
   }>({
     designation: '',
     ownershipPercentage: 50,
     profitSharePercentage: 50,
   });
+
+  // Signatures live in Agency Settings > Signature Store; match by partner id, then by name
+  const getPartnerSignature = (partner: PartnerEquityRecord) => {
+    const store = agencyProfile.signatureStore || [];
+    const matches = store.filter(s => s.partnerId === partner.partnerId || s.name === partner.partnerName);
+    return (matches.find(s => s.isDefault) || matches[0])?.signatureImage || partner.signatureImage;
+  };
 
   const canManageEquity = currentUser?.roleLevel !== undefined ? currentUser.roleLevel === 100 : true;
 
@@ -168,10 +175,10 @@ export const CapitalEquityView: React.FC = () => {
                 <div className="text-[10px] uppercase font-semibold text-ink-400 tracking-wider">
                   Deed Signature Specimen
                 </div>
-                {partner.signatureImage ? (
+                {getPartnerSignature(partner) ? (
                   <div className="h-10 mt-1 flex items-center">
                     <img 
-                      src={partner.signatureImage} 
+                      src={getPartnerSignature(partner)} 
                       alt={`${partner.partnerName} signature`} 
                       className="max-h-10 object-contain"
                     />
@@ -190,8 +197,7 @@ export const CapitalEquityView: React.FC = () => {
                     setEquityForm({
                       designation: partner.designation,
                       ownershipPercentage: partner.ownershipPercentage,
-                      profitSharePercentage: partner.profitSharePercentage,
-                      signatureImage: partner.signatureImage
+                      profitSharePercentage: partner.profitSharePercentage
                     });
                     setEditEquityModalOpen(true);
                   }}
@@ -458,14 +464,19 @@ export const CapitalEquityView: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-xs font-semibold uppercase text-ink-700">Partner Specimen Signature Image (Data URL / SVG)</label>
-                <textarea
-                  rows={2}
-                  value={equityForm.signatureImage || ''}
-                  onChange={(e) => setEquityForm({ ...equityForm, signatureImage: e.target.value })}
-                  placeholder="data:image/svg+xml;utf8,... or data:image/png;base64,..."
-                  className="w-full px-3 py-1.5 bg-parchment-50 border border-parchment-200 rounded-lg text-[11px] font-mono"
-                />
+                <label className="text-xs font-semibold uppercase text-ink-700">Specimen Signature</label>
+                <div className="mt-1 flex items-center justify-between gap-3 px-3 py-2 bg-parchment-50 border border-parchment-200 rounded-lg">
+                  {getPartnerSignature(selectedPartner) ? (
+                    <img
+                      src={getPartnerSignature(selectedPartner)}
+                      alt={`${selectedPartner.partnerName} signature`}
+                      className="max-h-10 object-contain"
+                    />
+                  ) : (
+                    <span className="text-xs italic text-ink-400">No signature found</span>
+                  )}
+                  <span className="text-[11px] text-ink-500 text-right">Managed in Agency Settings &rsaquo; Signature Store</span>
+                </div>
               </div>
 
               <div className="flex justify-end gap-2 pt-3 border-t border-parchment-200">

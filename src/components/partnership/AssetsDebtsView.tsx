@@ -434,17 +434,7 @@ export const AssetsDebtsView: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="flex items-center justify-between text-xs font-semibold uppercase text-ink-700">
-                    <span>Depreciation %</span>
-                    <span className="inline-flex items-center gap-1 normal-case font-medium text-ink-500">
-                      <input
-                        type="checkbox"
-                        checked={(assetForm.depreciationRatePercent ?? 0) > 0}
-                        onChange={(e) => setAssetForm({ ...assetForm, depreciationRatePercent: e.target.checked ? 15 : 0 })}
-                      />
-                      Depreciates
-                    </span>
-                  </label>
+                  <label className="text-xs font-semibold uppercase text-ink-700">Depreciation %</label>
                   <input
                     type="number"
                     min={0}
@@ -455,6 +445,14 @@ export const AssetsDebtsView: React.FC = () => {
                     onChange={(e) => setAssetForm({ ...assetForm, depreciationRatePercent: Number(e.target.value) })}
                     className="w-full px-3 py-1.5 bg-parchment-50 border border-parchment-200 rounded-lg text-xs font-mono disabled:opacity-50"
                   />
+                  <label className="mt-1 inline-flex items-center gap-1.5 text-[11px] text-ink-500 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={(assetForm.depreciationRatePercent ?? 0) > 0}
+                      onChange={(e) => setAssetForm({ ...assetForm, depreciationRatePercent: e.target.checked ? 15 : 0 })}
+                    />
+                    Depreciates
+                  </label>
                 </div>
                 <div>
                   <label className="text-xs font-semibold uppercase text-ink-700">Purchase Date</label>
