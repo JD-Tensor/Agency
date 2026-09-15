@@ -1337,7 +1337,7 @@ export const AgencyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       purchaseDate: asset.purchaseDate || now.split('T')[0],
       purchaseCost: asset.purchaseCost || 0,
       currentBookValue: asset.currentBookValue || asset.purchaseCost || 0,
-      depreciationRatePercent: asset.depreciationRatePercent || 15,
+      depreciationRatePercent: asset.depreciationRatePercent ?? 15,
       assignedTo: asset.assignedTo || 'Subhadip Jana',
       condition: asset.condition || 'active_excellent',
       notes: asset.notes,

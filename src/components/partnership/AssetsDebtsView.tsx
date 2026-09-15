@@ -264,7 +264,7 @@ export const AssetsDebtsView: React.FC = () => {
                       </td>
                       <td className="py-3 px-4 text-xs text-ink-600">{ast.purchaseDate}</td>
                       <td className="py-3 px-4 font-mono text-xs text-ink-600">{formatMoney(ast.purchaseCost)}</td>
-                      <td className="py-3 px-4 font-mono text-xs text-ink-500">{ast.depreciationRatePercent}% / yr</td>
+                      <td className="py-3 px-4 font-mono text-xs text-ink-500">{ast.depreciationRatePercent > 0 ? `${ast.depreciationRatePercent}% / yr` : 'None'}</td>
                       <td className="py-3 px-4 font-mono font-bold text-emerald-700">{formatMoney(ast.currentBookValue)}</td>
                       <td className="py-3 px-4 text-xs font-medium text-ink-800">{ast.assignedTo}</td>
                       <td className="py-3 px-4">
@@ -390,7 +390,12 @@ export const AssetsDebtsView: React.FC = () => {
                   <label className="text-xs font-semibold uppercase text-ink-700">Category</label>
                   <select
                     value={assetForm.category}
-                    onChange={(e) => setAssetForm({ ...assetForm, category: e.target.value as AssetCategory })}
+                    onChange={(e) => {
+                      const category = e.target.value as AssetCategory;
+                      // Domains and brand assets usually hold value, so default them to non-depreciating
+                      const depreciationRatePercent = category === 'domain_digital' ? 0 : (assetForm.depreciationRatePercent || 15);
+                      setAssetForm({ ...assetForm, category, depreciationRatePercent });
+                    }}
                     className="w-full px-3 py-1.5 bg-parchment-50 border border-parchment-200 rounded-lg text-xs"
                   >
                     <option value="computer_hardware">Computer Hardware & Workstations</option>
@@ -429,12 +434,26 @@ export const AssetsDebtsView: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold uppercase text-ink-700">Depreciation %</label>
+                  <label className="flex items-center justify-between text-xs font-semibold uppercase text-ink-700">
+                    <span>Depreciation %</span>
+                    <span className="inline-flex items-center gap-1 normal-case font-medium text-ink-500">
+                      <input
+                        type="checkbox"
+                        checked={(assetForm.depreciationRatePercent ?? 0) > 0}
+                        onChange={(e) => setAssetForm({ ...assetForm, depreciationRatePercent: e.target.checked ? 15 : 0 })}
+                      />
+                      Depreciates
+                    </span>
+                  </label>
                   <input
                     type="number"
-                    value={assetForm.depreciationRatePercent || 15}
+                    min={0}
+                    max={100}
+                    step="0.01"
+                    disabled={(assetForm.depreciationRatePercent ?? 0) <= 0}
+                    value={assetForm.depreciationRatePercent ?? 0}
                     onChange={(e) => setAssetForm({ ...assetForm, depreciationRatePercent: Number(e.target.value) })}
-                    className="w-full px-3 py-1.5 bg-parchment-50 border border-parchment-200 rounded-lg text-xs font-mono"
+                    className="w-full px-3 py-1.5 bg-parchment-50 border border-parchment-200 rounded-lg text-xs font-mono disabled:opacity-50"
                   />
                 </div>
                 <div>
