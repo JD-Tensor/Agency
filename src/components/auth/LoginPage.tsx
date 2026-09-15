@@ -94,7 +94,7 @@ export const LoginPage: React.FC = () => {
           </div>
           <div>
             <div className="font-serif text-sm font-bold text-ink-950 tracking-tight">
-              Jana & Das Engineering Partners
+              JD Tensor
             </div>
             <div className="text-[10px] uppercase font-semibold tracking-wider text-ink-500">
               Partnership Firm • Enterprise Systems & Product Engineering
@@ -298,7 +298,7 @@ export const LoginPage: React.FC = () => {
           <div className="mt-6 text-center">
             <div className="inline-flex items-center gap-2 text-xs text-ink-400 font-mono">
               <Building2 className="w-3.5 h-3.5" />
-              <span>Jana & Das Engineering Partners • Level-Based RBAC</span>
+              <span>JD Tensor • Level-Based RBAC</span>
             </div>
           </div>
         </div>

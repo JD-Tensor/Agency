@@ -71,7 +71,7 @@ export const SendDocumentModal: React.FC<SendDocumentModalProps> = ({
 
   const handleCopySlip = () => {
     if (!targetClient) return;
-    const slip = `Official Document Dispatch from StudioOps:
+    const slip = `Official Document Dispatch from JD Tensor:
 - Document: ${doc.title} (${doc.docNumber})
 - Issued To: ${targetClient.companyName} (Attn: ${targetClient.contactName})
 - Status: Issued / Available for Client Review
