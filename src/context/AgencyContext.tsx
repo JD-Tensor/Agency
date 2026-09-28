@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { AgencyProfile, StoredSignature } from '../types/agency';
 import { SavedDocument, DocumentType, DocumentPayload } from '../types/documents';
 import { Freelancer, AccessLevel, PaymentType } from '../types/freelancers';
@@ -289,7 +290,17 @@ export const AgencyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const [savedDocuments, setSavedDocuments] = useState<SavedDocument[]>([]);
-  const [currentView, setCurrentView] = useState<AppView>('partnership_hub');
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const pathParts = location.pathname.split('/').filter(Boolean);
+  const currentView = (pathParts.length > 1 && pathParts[0] === 'admin')
+    ? pathParts[1] as AppView
+    : 'partnership_hub' as AppView;
+
+  const setCurrentView = (view: AppView) => {
+    navigate(`/admin/${view}`);
+  };
   const [editingDocument, setEditingDocument] = useState<SavedDocument | null>(null);
   const [activeDocType, setActiveDocType] = useState<DocumentType>('proposal');
 
