@@ -1,4 +1,5 @@
 import React from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { AgencyProvider, useAgency } from './context/AgencyContext';
 import { MainLayout } from './components/layout/MainLayout';
 import { DashboardOverview } from './components/dashboard/DashboardOverview';
@@ -24,8 +25,53 @@ import { RoleManagementView } from './components/roles/RoleManagementView';
 
 import { LoginPage } from './components/auth/LoginPage';
 
-const AppContent: React.FC = () => {
-  const { currentView, editingDocument, currentUser, authLoading } = useAgency();
+const AppContentViews: React.FC = () => {
+  const { currentView, editingDocument } = useAgency();
+
+  switch (currentView) {
+    case 'partnership_hub':
+      return <PartnershipHub />;
+    case 'contracts_ledger':
+      return <ContractsLedger />;
+    case 'financial_ledgers':
+      return <FinancialLedgerView />;
+    case 'capital_equity':
+      return <CapitalEquityView />;
+    case 'ip_registry':
+      return <IpRegistryView />;
+    case 'assets_debts':
+      return <AssetsDebtsView />;
+    case 'tax_filings':
+      return <TaxFilingsView />;
+    case 'roles_matrix':
+      return <RoleManagementView />;
+    case 'dashboard':
+      return <DashboardOverview />;
+    case 'hub':
+      return <DocumentHub />;
+    case 'editor':
+      return <DocumentEditor key={editingDocument?.id} />;
+    case 'library':
+      return <DocumentList />;
+    case 'freelancers':
+      return <FreelancerDirectory />;
+    case 'clients':
+      return <ClientManagementDirectory />;
+    case 'tasks':
+      return <TaskManagementBoard />;
+    case 'my_workspace':
+      return <FreelancerWorkspace />;
+    case 'client_portal':
+      return <ClientPortal />;
+    case 'settings':
+      return <AgencySettings />;
+    default:
+      return <PartnershipHub />;
+  }
+};
+
+const AppRouter: React.FC = () => {
+  const { currentUser, authLoading } = useAgency();
 
   if (authLoading) {
     return (
@@ -35,66 +81,35 @@ const AppContent: React.FC = () => {
     );
   }
 
-  // If user is not authenticated, display the login page ONLY
-  if (!currentUser) {
-    return <LoginPage />;
-  }
-
-  const renderCurrentView = () => {
-    switch (currentView) {
-      case 'partnership_hub':
-        return <PartnershipHub />;
-      case 'contracts_ledger':
-        return <ContractsLedger />;
-      case 'financial_ledgers':
-        return <FinancialLedgerView />;
-      case 'capital_equity':
-        return <CapitalEquityView />;
-      case 'ip_registry':
-        return <IpRegistryView />;
-      case 'assets_debts':
-        return <AssetsDebtsView />;
-      case 'tax_filings':
-        return <TaxFilingsView />;
-      case 'roles_matrix':
-        return <RoleManagementView />;
-      case 'dashboard':
-        return <DashboardOverview />;
-      case 'hub':
-        return <DocumentHub />;
-      case 'editor':
-        return <DocumentEditor key={editingDocument?.id} />;
-      case 'library':
-        return <DocumentList />;
-      case 'freelancers':
-        return <FreelancerDirectory />;
-      case 'clients':
-        return <ClientManagementDirectory />;
-      case 'tasks':
-        return <TaskManagementBoard />;
-      case 'my_workspace':
-        return <FreelancerWorkspace />;
-      case 'client_portal':
-        return <ClientPortal />;
-      case 'settings':
-        return <AgencySettings />;
-      default:
-        return <PartnershipHub />;
-    }
-  };
-
   return (
-    <>
-      <MainLayout>{renderCurrentView()}</MainLayout>
-      <LoginModal />
-    </>
+    <Routes>
+      <Route path="/" element={<Navigate to="/admin" replace />} />
+      <Route 
+        path="/admin/login" 
+        element={currentUser ? <Navigate to="/admin" replace /> : <LoginPage />} 
+      />
+      <Route 
+        path="/admin/*" 
+        element={
+          currentUser ? (
+            <>
+              <MainLayout><AppContentViews /></MainLayout>
+              <LoginModal />
+            </>
+          ) : (
+            <Navigate to="/admin/login" replace />
+          )
+        } 
+      />
+      <Route path="*" element={<Navigate to="/admin" replace />} />
+    </Routes>
   );
 };
 
 export function App() {
   return (
     <AgencyProvider>
-      <AppContent />
+      <AppRouter />
     </AgencyProvider>
   );
 }
