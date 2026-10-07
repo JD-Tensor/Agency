@@ -24,6 +24,7 @@ import { TaxFilingsView } from './components/partnership/TaxFilingsView';
 import { RoleManagementView } from './components/roles/RoleManagementView';
 
 import { LoginPage } from './components/auth/LoginPage';
+import { LandingPage } from './components/landing/LandingPage';
 
 const AppContentViews: React.FC = () => {
   const { currentView, editingDocument } = useAgency();
@@ -83,7 +84,7 @@ const AppRouter: React.FC = () => {
 
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/admin" replace />} />
+      <Route path="/" element={<LandingPage />} />
       <Route 
         path="/admin/login" 
         element={currentUser ? <Navigate to="/admin" replace /> : <LoginPage />} 
@@ -101,7 +102,7 @@ const AppRouter: React.FC = () => {
           )
         } 
       />
-      <Route path="*" element={<Navigate to="/admin" replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 };

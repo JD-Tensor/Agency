@@ -517,7 +517,10 @@ export const AgencyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
         if (!cancelled) {
           setCurrentUser(resolved.user);
-          setCurrentView(landingViewFor(resolved.user));
+          // Only redirect when already inside /admin; keep the public landing page on '/'.
+          if (window.location.pathname.startsWith('/admin')) {
+            setCurrentView(landingViewFor(resolved.user));
+          }
         }
       } catch (err) {
         console.error('Session restore failed:', err);
