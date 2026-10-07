@@ -426,3 +426,41 @@ export const createTaskApi = (task: Task) => insertRow('tasks', pick(task, TASK_
 export const updateTaskApi = (id: string, patch: Partial<Task>) =>
   updateRow('tasks', 'id', id, { ...pick(patch, TASK_COLUMNS), updatedAt: new Date().toISOString() });
 export const deleteTaskApi = (id: string) => deleteRow('tasks', 'id', id);
+
+// ---------------------------------------------------------------------------
+// Website inquiries (landing page contact form)
+// ---------------------------------------------------------------------------
+
+export type InquiryStatus = 'new' | 'contacted' | 'closed';
+
+export interface Inquiry {
+  id: string;
+  name: string;
+  email: string;
+  message: string;
+  status: InquiryStatus;
+  source: string;
+  createdAt: string;
+}
+
+// Public: anonymous visitors can insert but not read back (no .select()).
+export const submitInquiryApi = async (input: { name: string; email: string; message: string }) => {
+  const { error } = await requireSupabase().from('inquiries').insert({
+    name: input.name.trim(),
+    email: input.email.trim(),
+    message: input.message.trim(),
+  });
+  if (error) fail('Send inquiry', error);
+};
+
+export const fetchInquiriesApi = () => selectAll<Inquiry>('inquiries', 'createdAt');
+
+export const updateInquiryStatusApi = async (id: string, status: InquiryStatus) => {
+  const { error } = await requireSupabase().from('inquiries').update({ status }).eq('id', id);
+  if (error) fail('Update inquiry', error);
+};
+
+export const deleteInquiryApi = async (id: string) => {
+  const { error } = await requireSupabase().from('inquiries').delete().eq('id', id);
+  if (error) fail('Delete inquiry', error);
+};

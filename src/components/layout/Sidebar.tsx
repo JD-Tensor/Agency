@@ -14,7 +14,8 @@ import {
   Lock,
   Laptop,
   FileCheck2,
-  Scale
+  Scale,
+  Inbox
 } from 'lucide-react';
 import { useAgency, AppView } from '../../context/AgencyContext';
 
@@ -47,6 +48,7 @@ export const Sidebar: React.FC = () => {
     { view: 'hub', label: 'Document Generators', icon: FilePlus2 },
     { view: 'tasks', label: 'Task Allocation', icon: CheckSquare },
     { view: 'clients', label: 'Clients & Portals', icon: Building2 },
+    { view: 'inquiries', label: 'Website Inquiries', icon: Inbox },
     { view: 'freelancers', label: 'Team & Directory', icon: Users },
     { view: 'library', label: 'Document Archive', icon: Files },
     { view: 'settings', label: 'Agency Settings', icon: Settings },

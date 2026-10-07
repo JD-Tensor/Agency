@@ -67,6 +67,7 @@ export type AppView =
   | 'tasks'
   | 'my_workspace'
   | 'client_portal'
+  | 'inquiries'
   | 'settings';
 
 interface AgencyContextType {

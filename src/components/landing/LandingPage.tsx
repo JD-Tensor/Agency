@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, ArrowUpRight, CheckCircle2 } from 'lucide-react';
+import { submitInquiryApi } from '../../services/api';
 import './landing.css';
 
 /* ---------- content ---------- */
@@ -344,6 +345,17 @@ export const LandingPage: React.FC = () => {
   const [ready, setReady] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [form, setForm] = useState({ name: '', email: '', message: '' });
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSending(true); setFormError('');
+    try { await submitInquiryApi(form); setSent(true); setForm({ name: '', email: '', message: '' }); }
+    catch { setFormError('Something went wrong. Please try again or email us directly.'); }
+    finally { setSending(false); }
+  };
   const [ti, setTi] = useState(0);
 
   const onLoaded = React.useCallback(() => { setReady(true); setTimeout(() => setLoading(false), 1100); }, []);
@@ -626,12 +638,13 @@ export const LandingPage: React.FC = () => {
               <h2 className="lp-h2">Have an idea? Let’s build it <span className="lp-serif">together.</span></h2>
               <ul>{['Free 30-minute strategy call', 'Transparent, fixed-scope pricing', 'NDA signed before we talk details'].map((x) => <li key={x}><CheckCircle2 size={18} />{x}</li>)}</ul>
             </div>
-            <form className="lp-form" onSubmit={(e) => { e.preventDefault(); setSent(true); }}>
-              <input className="lp-field" required placeholder="Your name" />
-              <input className="lp-field" required type="email" placeholder="Work email" />
-              <textarea className="lp-field" required rows={4} placeholder="Tell us about your project…" />
+            <form className="lp-form" onSubmit={submit}>
+              <input className="lp-field" required maxLength={200} placeholder="Your name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              <input className="lp-field" required type="email" maxLength={320} placeholder="Work email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+              <textarea className="lp-field" required rows={4} maxLength={5000} placeholder="Tell us about your project…" value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} />
+              {formError && <div className="lp-ok" style={{ color: '#ff9a5c' }}>{formError}</div>}
               {sent ? <div className="lp-ok">Thanks! We got your message and will be in touch shortly.</div>
-                : <button type="submit" className="lp-btn lp-btn-primary" onMouseMove={magnet} onMouseLeave={unmagnet}>Send message <ArrowRight size={18} /></button>}
+                : <button type="submit" disabled={sending} className="lp-btn lp-btn-primary" onMouseMove={magnet} onMouseLeave={unmagnet}>{sending ? 'Sending…' : 'Send message'} <ArrowRight size={18} /></button>}
             </form>
           </div>
         </div>

@@ -679,3 +679,40 @@ CREATE POLICY tasks_update ON public.tasks FOR UPDATE TO authenticated
   WITH CHECK (public.app_can_write_documents() OR "freelancerId" = public.app_user_id());
 CREATE POLICY tasks_delete ON public.tasks FOR DELETE TO authenticated
   USING (public.app_can_write_documents());
+
+-- =============================================================================
+-- WEBSITE INQUIRIES
+-- Landing page contact form. Anonymous visitors may INSERT only; they cannot
+-- read anything back. Staff read; level 40+ update status; level 60+ delete.
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS public.inquiries (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    message TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'new',
+    source TEXT DEFAULT 'landing_page',
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
+    CONSTRAINT inquiries_name_len CHECK (char_length(name) BETWEEN 1 AND 200),
+    CONSTRAINT inquiries_email_len CHECK (char_length(email) BETWEEN 3 AND 320),
+    CONSTRAINT inquiries_message_len CHECK (char_length(message) BETWEEN 1 AND 5000),
+    CONSTRAINT inquiries_status_val CHECK (status IN ('new', 'contacted', 'closed'))
+);
+
+ALTER TABLE public.inquiries ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS inquiries_public_insert ON public.inquiries;
+DROP POLICY IF EXISTS inquiries_staff_read ON public.inquiries;
+DROP POLICY IF EXISTS inquiries_staff_update ON public.inquiries;
+DROP POLICY IF EXISTS inquiries_staff_delete ON public.inquiries;
+
+CREATE POLICY inquiries_public_insert ON public.inquiries FOR INSERT TO anon, authenticated
+  WITH CHECK (status = 'new' AND source = 'landing_page');
+CREATE POLICY inquiries_staff_read ON public.inquiries FOR SELECT TO authenticated
+  USING (public.app_is_staff());
+CREATE POLICY inquiries_staff_update ON public.inquiries FOR UPDATE TO authenticated
+  USING (public.app_role_level() >= 40) WITH CHECK (public.app_role_level() >= 40);
+CREATE POLICY inquiries_staff_delete ON public.inquiries FOR DELETE TO authenticated
+  USING (public.app_role_level() >= 60);
+
+GRANT INSERT ON public.inquiries TO anon;

@@ -24,6 +24,7 @@ import { TaxFilingsView } from './components/partnership/TaxFilingsView';
 import { RoleManagementView } from './components/roles/RoleManagementView';
 
 import { LoginPage } from './components/auth/LoginPage';
+import { InquiriesView } from './components/inquiries/InquiriesView';
 import { LandingPage } from './components/landing/LandingPage';
 
 const AppContentViews: React.FC = () => {
@@ -64,6 +65,8 @@ const AppContentViews: React.FC = () => {
       return <FreelancerWorkspace />;
     case 'client_portal':
       return <ClientPortal />;
+    case 'inquiries':
+      return <InquiriesView />;
     case 'settings':
       return <AgencySettings />;
     default:
