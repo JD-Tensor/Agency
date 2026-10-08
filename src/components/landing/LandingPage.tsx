@@ -38,9 +38,8 @@ const PROJECTS = [
 const STACK = ['React', 'Next.js', 'TypeScript', 'Node.js', 'Python', 'Go', 'PostgreSQL', 'Supabase', 'GraphQL', 'React Native', 'Flutter', 'AWS', 'Docker', 'Kubernetes', 'Tailwind', 'OpenAI', 'Redis', 'Terraform'];
 
 const TESTIMONIALS = [
-  { q: 'They shipped our MVP in six weeks and it felt like a product from a ten-person team. Communication was flawless.', n: 'Aarav Mehta', r: 'CEO, Nimbus Pay' },
-  { q: 'A rare mix of design taste and engineering depth. Our conversion rate jumped 38% after the redesign.', n: 'Sofia Laurent', r: 'Head of Product, PulseCare' },
-  { q: 'The AI copilot they built is now core to how our analysts work. Honestly the best agency we have used.', n: 'Daniel Okafor', r: 'CTO, Lumen AI' },
+  { q: 'They managed and shipped our entire backend with multiple AI integration for customer service in one week, flawless.', n: 'Oliver Rivers', r: 'CEO, Laguku.co' },
+  { q: 'The team at JD Tensor delivered beyond our expectations. Their attention to detail and commitment to quality is unmatched.', n: 'Shekhar Pradhan', r: 'CEO, Kognie.com' },
 ];
 
 const STATEMENT = 'We are a software agency turning ambitious ideas into fast elegant scalable products. Design, engineering and AI under one roof, shipped with obsessive craft.';
