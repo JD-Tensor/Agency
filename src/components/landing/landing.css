@@ -174,13 +174,13 @@
 .lp-art-fill-dim { fill: rgba(217,114,54,0.25); }
 
 /* ---------- work (horizontal) ---------- */
-.lp-hs { height: 420vh; position: relative; }
+.lp-hs { height: 340vh; position: relative; }
 .lp-hs-pin { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; justify-content: center; overflow: hidden; gap: 40px; }
 .lp-hs-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 30px; }
 .lp-hs-bar { height: 2px; background: var(--line); position: relative; flex: 1; max-width: 260px; margin-bottom: 16px; }
 .lp-hs-bar i { position: absolute; inset: 0; background: var(--o); transform-origin: left; transform: scaleX(var(--hp, 0)); }
 .lp-hs-track { display: flex; gap: 28px; padding: 0 max(24px, calc((100vw - 1200px) / 2)); will-change: transform; }
-.lp-proj { flex: 0 0 auto; width: min(560px, 82vw); height: min(470px, 58vh); border-radius: 30px; border: 1px solid var(--line); position: relative; overflow: hidden; padding: 30px; display: flex; flex-direction: column; justify-content: flex-end; isolation: isolate; background: var(--bg-2); }
+.lp-proj { display: flex; flex: 0 0 auto; width: min(560px, 82vw); height: min(470px, 58vh); border-radius: 30px; border: 1px solid var(--line); position: relative; overflow: hidden; padding: 30px; display: flex; flex-direction: column; justify-content: flex-end; isolation: isolate; background: var(--bg-2); }
 .lp-proj-bg { position: absolute; inset: 0; z-index: -2; transition: transform 1s cubic-bezier(.2,.8,.2,1); background: radial-gradient(circle at var(--gx, 30%) 0%, rgba(217,114,54,var(--ga, 0.5)), transparent 62%); }
 .lp-proj:hover .lp-proj-bg { transform: scale(1.2); }
 .lp-proj::after { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, transparent 38%, rgba(10,9,8,0.95)); }

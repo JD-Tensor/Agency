@@ -30,10 +30,9 @@ const STEPS = [
 ];
 
 const PROJECTS = [
-  { cat: 'FinTech · Web', title: 'Nimbus Pay', text: 'Real-time payments dashboard processing 2M+ transactions a day.', art: 'bars', gx: '25%' },
-  { cat: 'HealthTech · Mobile', title: 'PulseCare', text: 'Patient companion app with live vitals, bookings and video consults.', art: 'pulse', gx: '70%' },
-  { cat: 'AI · SaaS', title: 'Lumen AI', text: 'Document intelligence copilot that cuts research time by 70%.', art: 'dots', gx: '40%' },
-  { cat: 'E-commerce · Platform', title: 'Orbit Market', text: 'Headless commerce engine with sub-second pages across 12 regions.', art: 'wave', gx: '80%' },
+  { cat: 'AI · SaaS', title: 'Kognie', text: 'Multi-agent AI graphic designer that conversationally creates ads, social posts and branding visuals in seconds.', art: 'dots', gx: '30%', href: 'https://kognie.com' },
+  { cat: 'Consumer · Web', title: 'Laguku', text: 'Personalized songs for loved ones. Turn memories into a special song, trusted by 5000+ happy customers.', art: 'wave', gx: '75%', href: 'https://laguku.co' },
+  { cat: 'AI · Open Source', title: 'Motion Studio', text: 'Self-hosted studio that turns a topic into a voiced 9:16 motion-graphics short for Reels, Shorts and ads, with Claude Code writing the animation.', art: 'bars', gx: '50%', href: 'https://github.com/JD-Tensor/motion-studio' },
 ];
 
 const STACK = ['React', 'Next.js', 'TypeScript', 'Node.js', 'Python', 'Go', 'PostgreSQL', 'Supabase', 'GraphQL', 'React Native', 'Flutter', 'AWS', 'Docker', 'Kubernetes', 'Tailwind', 'OpenAI', 'Redis', 'Terraform'];
@@ -570,13 +569,13 @@ export const LandingPage: React.FC = () => {
           </div>
           <div className="lp-hs-track" data-hs-track>
             {PROJECTS.map((p, i) => (
-              <article className="lp-proj" key={p.title} data-hot>
+              <a className="lp-proj" key={p.title} href={p.href} target="_blank" rel="noopener noreferrer" data-hot>
                 <div className="lp-proj-bg" style={{ ['--gx' as string]: p.gx, ['--ga' as string]: 0.35 + i * 0.08 }} />
                 <ProjectArt k={p.art} />
                 <span className="idx">0{i + 1} / 0{PROJECTS.length}</span>
                 <div className="go"><ArrowUpRight size={20} /></div>
                 <small>{p.cat}</small><h3>{p.title}</h3><p>{p.text}</p>
-              </article>
+              </a>
             ))}
           </div>
         </div>
