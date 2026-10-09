@@ -12,6 +12,225 @@
   }
 }
 
+/* ---------- Theme tokens (admin panel) ----------
+   Tailwind palette reads these variables. `.admin-dark` on <html> swaps them.
+   Document templates (.a4-sheet) always keep the light palette (paper). */
+:root, .a4-sheet {
+  --c-parchment-50: 252 251 248;
+  --c-parchment-100: 247 245 240;
+  --c-parchment-200: 239 236 228;
+  --c-parchment-300: 227 223 213;
+  --c-parchment-400: 199 194 180;
+  --c-parchment-500: 164 159 144;
+  --c-ink-950: 20 19 18;
+  --c-ink-900: 31 30 29;
+  --c-ink-800: 46 44 41;
+  --c-ink-700: 67 64 59;
+  --c-ink-600: 94 91 84;
+  --c-ink-500: 127 123 114;
+  --c-ink-400: 163 159 149;
+  --c-clay-50: 250 243 238;
+  --c-clay-100: 245 228 216;
+  --c-clay-500: 217 114 54;
+  --c-clay-600: 194 94 38;
+  --c-clay-700: 165 73 23;
+  --c-forest-50: 241 247 244;
+  --c-forest-700: 36 81 71;
+  --c-forest-800: 27 62 54;
+}
+.admin-dark {
+  color-scheme: dark;
+  --c-parchment-50: 22 20 17;
+  --c-parchment-100: 17 15 13;
+  --c-parchment-200: 42 38 33;
+  --c-parchment-300: 58 53 46;
+  --c-parchment-400: 90 83 72;
+  --c-parchment-500: 125 117 104;
+  --c-ink-950: 243 237 228;
+  --c-ink-900: 232 225 214;
+  --c-ink-800: 214 206 194;
+  --c-ink-700: 189 180 167;
+  --c-ink-600: 162 154 141;
+  --c-ink-500: 138 130 118;
+  --c-ink-400: 111 104 93;
+  --c-clay-50: 42 26 16;
+  --c-clay-100: 62 37 21;
+  --c-clay-500: 224 122 60;
+  --c-clay-600: 232 133 74;
+  --c-clay-700: 240 152 95;
+  --c-forest-50: 20 35 31;
+  --c-forest-700: 110 190 170;
+  --c-forest-800: 150 215 195;
+  --surface: 28 25 22;
+}
+@media print {
+  .admin-dark {
+  --c-parchment-50: 252 251 248;
+  --c-parchment-100: 247 245 240;
+  --c-parchment-200: 239 236 228;
+  --c-parchment-300: 227 223 213;
+  --c-parchment-400: 199 194 180;
+  --c-parchment-500: 164 159 144;
+  --c-ink-950: 20 19 18;
+  --c-ink-900: 31 30 29;
+  --c-ink-800: 46 44 41;
+  --c-ink-700: 67 64 59;
+  --c-ink-600: 94 91 84;
+  --c-ink-500: 127 123 114;
+  --c-ink-400: 163 159 149;
+  --c-clay-50: 250 243 238;
+  --c-clay-100: 245 228 216;
+  --c-clay-500: 217 114 54;
+  --c-clay-600: 194 94 38;
+  --c-clay-700: 165 73 23;
+  --c-forest-50: 241 247 244;
+  --c-forest-700: 36 81 71;
+  --c-forest-800: 27 62 54;
+  }
+}
+.admin-dark ::-webkit-scrollbar-thumb { background: #3a352e; }
+.admin-dark ::-webkit-scrollbar-thumb:hover { background: #5a5348; }
+.admin-dark .bg-white:not(.a4-sheet):not(.a4-sheet *) { background-color: rgb(var(--surface)); }
+.admin-dark [class*="bg-white/"]:not(.a4-sheet):not(.a4-sheet *) { background-color: rgb(var(--surface) / 0.85); }
+.admin-dark .hover\:bg-white:hover:not(.a4-sheet):not(.a4-sheet *) { background-color: rgb(var(--surface)); }
+.admin-dark [class*="bg-ink-950/"] { background-color: rgba(0, 0, 0, 0.7); }
+.admin-dark [class*="to-ink-950"] { --tw-gradient-to: #1a1410 var(--tw-gradient-to-position) !important; }
+.admin-dark .bg-slate-100:not(.a4-sheet):not(.a4-sheet *) { background-color: rgba(148,163,184,.14); }
+.admin-dark .bg-emerald-50:not(.a4-sheet):not(.a4-sheet *){ background-color: rgba(16,185,129,.12); }
+.admin-dark .bg-emerald-100:not(.a4-sheet):not(.a4-sheet *){ background-color: rgba(16,185,129,.2); }
+.admin-dark .border-emerald-200:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(16,185,129,.35); }
+.admin-dark .border-emerald-300:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(16,185,129,.35); }
+.admin-dark .border-emerald-100:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(16,185,129,.25); }
+.admin-dark .text-emerald-600:not(.a4-sheet):not(.a4-sheet *){ color: #6ee7b7; }
+.admin-dark .text-emerald-700:not(.a4-sheet):not(.a4-sheet *){ color: #6ee7b7; }
+.admin-dark .text-emerald-800:not(.a4-sheet):not(.a4-sheet *){ color: #6ee7b7; }
+.admin-dark .text-emerald-900:not(.a4-sheet):not(.a4-sheet *){ color: #6ee7b7; }
+.admin-dark .text-emerald-950:not(.a4-sheet):not(.a4-sheet *){ color: #6ee7b7; }
+.admin-dark .bg-amber-50:not(.a4-sheet):not(.a4-sheet *){ background-color: rgba(245,158,11,.12); }
+.admin-dark .bg-amber-100:not(.a4-sheet):not(.a4-sheet *){ background-color: rgba(245,158,11,.2); }
+.admin-dark .border-amber-200:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(245,158,11,.35); }
+.admin-dark .border-amber-300:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(245,158,11,.35); }
+.admin-dark .border-amber-100:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(245,158,11,.25); }
+.admin-dark .text-amber-600:not(.a4-sheet):not(.a4-sheet *){ color: #fcd34d; }
+.admin-dark .text-amber-700:not(.a4-sheet):not(.a4-sheet *){ color: #fcd34d; }
+.admin-dark .text-amber-800:not(.a4-sheet):not(.a4-sheet *){ color: #fcd34d; }
+.admin-dark .text-amber-900:not(.a4-sheet):not(.a4-sheet *){ color: #fcd34d; }
+.admin-dark .text-amber-950:not(.a4-sheet):not(.a4-sheet *){ color: #fcd34d; }
+.admin-dark .bg-red-50:not(.a4-sheet):not(.a4-sheet *){ background-color: rgba(239,68,68,.12); }
+.admin-dark .bg-red-100:not(.a4-sheet):not(.a4-sheet *){ background-color: rgba(239,68,68,.2); }
+.admin-dark .border-red-200:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(239,68,68,.35); }
+.admin-dark .border-red-300:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(239,68,68,.35); }
+.admin-dark .border-red-100:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(239,68,68,.25); }
+.admin-dark .text-red-600:not(.a4-sheet):not(.a4-sheet *){ color: #fca5a5; }
+.admin-dark .text-red-700:not(.a4-sheet):not(.a4-sheet *){ color: #fca5a5; }
+.admin-dark .text-red-800:not(.a4-sheet):not(.a4-sheet *){ color: #fca5a5; }
+.admin-dark .text-red-900:not(.a4-sheet):not(.a4-sheet *){ color: #fca5a5; }
+.admin-dark .text-red-950:not(.a4-sheet):not(.a4-sheet *){ color: #fca5a5; }
+.admin-dark .bg-rose-50:not(.a4-sheet):not(.a4-sheet *){ background-color: rgba(244,63,94,.12); }
+.admin-dark .bg-rose-100:not(.a4-sheet):not(.a4-sheet *){ background-color: rgba(244,63,94,.2); }
+.admin-dark .border-rose-200:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(244,63,94,.35); }
+.admin-dark .border-rose-300:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(244,63,94,.35); }
+.admin-dark .border-rose-100:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(244,63,94,.25); }
+.admin-dark .text-rose-600:not(.a4-sheet):not(.a4-sheet *){ color: #fda4af; }
+.admin-dark .text-rose-700:not(.a4-sheet):not(.a4-sheet *){ color: #fda4af; }
+.admin-dark .text-rose-800:not(.a4-sheet):not(.a4-sheet *){ color: #fda4af; }
+.admin-dark .text-rose-900:not(.a4-sheet):not(.a4-sheet *){ color: #fda4af; }
+.admin-dark .text-rose-950:not(.a4-sheet):not(.a4-sheet *){ color: #fda4af; }
+.admin-dark .bg-blue-50:not(.a4-sheet):not(.a4-sheet *){ background-color: rgba(59,130,246,.12); }
+.admin-dark .bg-blue-100:not(.a4-sheet):not(.a4-sheet *){ background-color: rgba(59,130,246,.2); }
+.admin-dark .border-blue-200:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(59,130,246,.35); }
+.admin-dark .border-blue-300:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(59,130,246,.35); }
+.admin-dark .border-blue-100:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(59,130,246,.25); }
+.admin-dark .text-blue-600:not(.a4-sheet):not(.a4-sheet *){ color: #93c5fd; }
+.admin-dark .text-blue-700:not(.a4-sheet):not(.a4-sheet *){ color: #93c5fd; }
+.admin-dark .text-blue-800:not(.a4-sheet):not(.a4-sheet *){ color: #93c5fd; }
+.admin-dark .text-blue-900:not(.a4-sheet):not(.a4-sheet *){ color: #93c5fd; }
+.admin-dark .text-blue-950:not(.a4-sheet):not(.a4-sheet *){ color: #93c5fd; }
+.admin-dark .bg-purple-50:not(.a4-sheet):not(.a4-sheet *){ background-color: rgba(168,85,247,.12); }
+.admin-dark .bg-purple-100:not(.a4-sheet):not(.a4-sheet *){ background-color: rgba(168,85,247,.2); }
+.admin-dark .border-purple-200:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(168,85,247,.35); }
+.admin-dark .border-purple-300:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(168,85,247,.35); }
+.admin-dark .border-purple-100:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(168,85,247,.25); }
+.admin-dark .text-purple-600:not(.a4-sheet):not(.a4-sheet *){ color: #d8b4fe; }
+.admin-dark .text-purple-700:not(.a4-sheet):not(.a4-sheet *){ color: #d8b4fe; }
+.admin-dark .text-purple-800:not(.a4-sheet):not(.a4-sheet *){ color: #d8b4fe; }
+.admin-dark .text-purple-900:not(.a4-sheet):not(.a4-sheet *){ color: #d8b4fe; }
+.admin-dark .text-purple-950:not(.a4-sheet):not(.a4-sheet *){ color: #d8b4fe; }
+.admin-dark .bg-slate-50:not(.a4-sheet):not(.a4-sheet *){ background-color: rgba(148,163,184,.12); }
+.admin-dark .bg-slate-100:not(.a4-sheet):not(.a4-sheet *){ background-color: rgba(148,163,184,.2); }
+.admin-dark .border-slate-200:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(148,163,184,.35); }
+.admin-dark .border-slate-300:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(148,163,184,.35); }
+.admin-dark .border-slate-100:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(148,163,184,.25); }
+.admin-dark .text-slate-600:not(.a4-sheet):not(.a4-sheet *){ color: #cbd5e1; }
+.admin-dark .text-slate-700:not(.a4-sheet):not(.a4-sheet *){ color: #cbd5e1; }
+.admin-dark .text-slate-800:not(.a4-sheet):not(.a4-sheet *){ color: #cbd5e1; }
+.admin-dark .text-slate-900:not(.a4-sheet):not(.a4-sheet *){ color: #cbd5e1; }
+.admin-dark .text-slate-950:not(.a4-sheet):not(.a4-sheet *){ color: #cbd5e1; }
+.admin-dark .bg-teal-50:not(.a4-sheet):not(.a4-sheet *){ background-color: rgba(20,184,166,.12); }
+.admin-dark .bg-teal-100:not(.a4-sheet):not(.a4-sheet *){ background-color: rgba(20,184,166,.2); }
+.admin-dark .border-teal-200:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(20,184,166,.35); }
+.admin-dark .border-teal-300:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(20,184,166,.35); }
+.admin-dark .border-teal-100:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(20,184,166,.25); }
+.admin-dark .text-teal-600:not(.a4-sheet):not(.a4-sheet *){ color: #5eead4; }
+.admin-dark .text-teal-700:not(.a4-sheet):not(.a4-sheet *){ color: #5eead4; }
+.admin-dark .text-teal-800:not(.a4-sheet):not(.a4-sheet *){ color: #5eead4; }
+.admin-dark .text-teal-900:not(.a4-sheet):not(.a4-sheet *){ color: #5eead4; }
+.admin-dark .text-teal-950:not(.a4-sheet):not(.a4-sheet *){ color: #5eead4; }
+.admin-dark .bg-indigo-50:not(.a4-sheet):not(.a4-sheet *){ background-color: rgba(99,102,241,.12); }
+.admin-dark .bg-indigo-100:not(.a4-sheet):not(.a4-sheet *){ background-color: rgba(99,102,241,.2); }
+.admin-dark .border-indigo-200:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(99,102,241,.35); }
+.admin-dark .border-indigo-300:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(99,102,241,.35); }
+.admin-dark .border-indigo-100:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(99,102,241,.25); }
+.admin-dark .text-indigo-600:not(.a4-sheet):not(.a4-sheet *){ color: #a5b4fc; }
+.admin-dark .text-indigo-700:not(.a4-sheet):not(.a4-sheet *){ color: #a5b4fc; }
+.admin-dark .text-indigo-800:not(.a4-sheet):not(.a4-sheet *){ color: #a5b4fc; }
+.admin-dark .text-indigo-900:not(.a4-sheet):not(.a4-sheet *){ color: #a5b4fc; }
+.admin-dark .text-indigo-950:not(.a4-sheet):not(.a4-sheet *){ color: #a5b4fc; }
+.admin-dark .bg-violet-50:not(.a4-sheet):not(.a4-sheet *){ background-color: rgba(139,92,246,.12); }
+.admin-dark .bg-violet-100:not(.a4-sheet):not(.a4-sheet *){ background-color: rgba(139,92,246,.2); }
+.admin-dark .border-violet-200:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(139,92,246,.35); }
+.admin-dark .border-violet-300:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(139,92,246,.35); }
+.admin-dark .border-violet-100:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(139,92,246,.25); }
+.admin-dark .text-violet-600:not(.a4-sheet):not(.a4-sheet *){ color: #c4b5fd; }
+.admin-dark .text-violet-700:not(.a4-sheet):not(.a4-sheet *){ color: #c4b5fd; }
+.admin-dark .text-violet-800:not(.a4-sheet):not(.a4-sheet *){ color: #c4b5fd; }
+.admin-dark .text-violet-900:not(.a4-sheet):not(.a4-sheet *){ color: #c4b5fd; }
+.admin-dark .text-violet-950:not(.a4-sheet):not(.a4-sheet *){ color: #c4b5fd; }
+.admin-dark .bg-sky-50:not(.a4-sheet):not(.a4-sheet *){ background-color: rgba(14,165,233,.12); }
+.admin-dark .bg-sky-100:not(.a4-sheet):not(.a4-sheet *){ background-color: rgba(14,165,233,.2); }
+.admin-dark .border-sky-200:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(14,165,233,.35); }
+.admin-dark .border-sky-300:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(14,165,233,.35); }
+.admin-dark .border-sky-100:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(14,165,233,.25); }
+.admin-dark .text-sky-600:not(.a4-sheet):not(.a4-sheet *){ color: #7dd3fc; }
+.admin-dark .text-sky-700:not(.a4-sheet):not(.a4-sheet *){ color: #7dd3fc; }
+.admin-dark .text-sky-800:not(.a4-sheet):not(.a4-sheet *){ color: #7dd3fc; }
+.admin-dark .text-sky-900:not(.a4-sheet):not(.a4-sheet *){ color: #7dd3fc; }
+.admin-dark .text-sky-950:not(.a4-sheet):not(.a4-sheet *){ color: #7dd3fc; }
+.admin-dark .bg-orange-50:not(.a4-sheet):not(.a4-sheet *){ background-color: rgba(249,115,22,.12); }
+.admin-dark .bg-orange-100:not(.a4-sheet):not(.a4-sheet *){ background-color: rgba(249,115,22,.2); }
+.admin-dark .border-orange-200:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(249,115,22,.35); }
+.admin-dark .border-orange-300:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(249,115,22,.35); }
+.admin-dark .border-orange-100:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(249,115,22,.25); }
+.admin-dark .text-orange-600:not(.a4-sheet):not(.a4-sheet *){ color: #fdba74; }
+.admin-dark .text-orange-700:not(.a4-sheet):not(.a4-sheet *){ color: #fdba74; }
+.admin-dark .text-orange-800:not(.a4-sheet):not(.a4-sheet *){ color: #fdba74; }
+.admin-dark .text-orange-900:not(.a4-sheet):not(.a4-sheet *){ color: #fdba74; }
+.admin-dark .text-orange-950:not(.a4-sheet):not(.a4-sheet *){ color: #fdba74; }
+.admin-dark .bg-cyan-50:not(.a4-sheet):not(.a4-sheet *){ background-color: rgba(6,182,212,.12); }
+.admin-dark .bg-cyan-100:not(.a4-sheet):not(.a4-sheet *){ background-color: rgba(6,182,212,.2); }
+.admin-dark .border-cyan-200:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(6,182,212,.35); }
+.admin-dark .border-cyan-300:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(6,182,212,.35); }
+.admin-dark .border-cyan-100:not(.a4-sheet):not(.a4-sheet *){ border-color: rgba(6,182,212,.25); }
+.admin-dark .text-cyan-600:not(.a4-sheet):not(.a4-sheet *){ color: #67e8f9; }
+.admin-dark .text-cyan-700:not(.a4-sheet):not(.a4-sheet *){ color: #67e8f9; }
+.admin-dark .text-cyan-800:not(.a4-sheet):not(.a4-sheet *){ color: #67e8f9; }
+.admin-dark .text-cyan-900:not(.a4-sheet):not(.a4-sheet *){ color: #67e8f9; }
+.admin-dark .text-cyan-950:not(.a4-sheet):not(.a4-sheet *){ color: #67e8f9; }
+
+.theme-anim, .theme-anim *, .theme-anim *::before, .theme-anim *::after {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease !important;
+}
+
 /* Custom subtle scrollbar */
 ::-webkit-scrollbar {
   width: 6px;

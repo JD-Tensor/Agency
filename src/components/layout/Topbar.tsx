@@ -3,12 +3,19 @@ import {
   Download, 
   Upload, 
   KeyRound,
-  LogOut
+  LogOut,
+  Moon,
+  Sun
 } from 'lucide-react';
 import { useAgency } from '../../context/AgencyContext';
 import { CurrencyToggle } from '../common/CurrencyToggle';
 
-export const Topbar: React.FC = () => {
+interface TopbarProps {
+  theme: 'light' | 'dark';
+  onToggleTheme: () => void;
+}
+
+export const Topbar: React.FC<TopbarProps> = ({ theme, onToggleTheme }) => {
   const { 
     currentView, 
     exportDataJson, 
@@ -79,6 +86,15 @@ export const Topbar: React.FC = () => {
           accept=".json" 
           className="hidden" 
         />
+
+        <button
+          onClick={onToggleTheme}
+          title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          aria-label="Toggle dark mode"
+          className="p-2 rounded-lg border border-parchment-200 text-ink-600 hover:text-clay-700 hover:border-clay-500 transition"
+        >
+          {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+        </button>
 
         {/* Global Currency Toggle (USD <-> INR) */}
         <div className="flex items-center">
