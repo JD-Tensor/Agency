@@ -93,10 +93,13 @@ const AppRouter: React.FC = () => {
   const { currentUser, authLoading } = useAgency();
 
   useEffect(() => {
-    if (!isSupabaseConfigured()) { initMetaPixel(); return; }
+    // Fire straight away when a build-time ID exists, so tracking never waits
+    // on the network; the stored ID then wins if it differs.
+    initMetaPixel();
+    if (!isSupabaseConfigured()) return;
     fetchSiteSettingsApi()
       .then((s) => initMetaPixel(s.metaPixelId))
-      .catch(() => initMetaPixel());
+      .catch(() => { /* build-time ID, if any, is already active */ });
   }, []);
 
   if (authLoading) {
