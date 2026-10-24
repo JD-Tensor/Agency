@@ -19,21 +19,24 @@ export const initMetaPixel = (pixelId?: string): void => {
   if (!id || id === activePixelId || typeof window === 'undefined') return;
 
   if (!window.fbq) {
+    /* Meta's official base snippet, kept verbatim in behaviour: the queued
+     * calls must be `arguments` objects for fbevents.js to replay them. */
     /* eslint-disable */
-    (function (f: any, b: Document, e: string, v: string) {
-      const n: any = (f.fbq = function (...args: unknown[]) {
-        n.callMethod ? n.callMethod.apply(n, args) : n.queue.push(args);
-      });
+    (function (f: any, b: any, e: any, v: any, n?: any, t?: any, s?: any) {
+      if (f.fbq) return;
+      n = f.fbq = function () {
+        n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments);
+      };
       if (!f._fbq) f._fbq = n;
       n.push = n;
-      n.loaded = true;
+      n.loaded = !0;
       n.version = '2.0';
       n.queue = [];
-      const t = b.createElement(e) as HTMLScriptElement;
-      t.async = true;
+      t = b.createElement(e);
+      t.async = !0;
       t.src = v;
-      const s = b.getElementsByTagName(e)[0];
-      s.parentNode?.insertBefore(t, s);
+      s = b.getElementsByTagName(e)[0];
+      s.parentNode.insertBefore(t, s);
     })(window, document, 'script', 'https://connect.facebook.net/en_US/fbevents.js');
     /* eslint-enable */
   }
