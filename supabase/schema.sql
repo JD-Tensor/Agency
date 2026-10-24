@@ -716,3 +716,31 @@ CREATE POLICY inquiries_staff_delete ON public.inquiries FOR DELETE TO authentic
   USING (public.app_role_level() >= 60);
 
 GRANT INSERT ON public.inquiries TO anon;
+
+-- =============================================================================
+-- PUBLIC SITE SETTINGS
+-- Single-row config read by the anonymous landing page (e.g. the Meta Pixel
+-- ID), editable only by staff at role level 80+ via Agency Settings.
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS public.site_settings (
+    id TEXT PRIMARY KEY,
+    "metaPixelId" TEXT,
+    "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+ALTER TABLE public.site_settings ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS site_settings_public_read ON public.site_settings;
+DROP POLICY IF EXISTS site_settings_staff_write ON public.site_settings;
+DROP POLICY IF EXISTS site_settings_staff_update ON public.site_settings;
+
+CREATE POLICY site_settings_public_read ON public.site_settings FOR SELECT TO anon, authenticated
+  USING (true);
+CREATE POLICY site_settings_staff_write ON public.site_settings FOR INSERT TO authenticated
+  WITH CHECK (public.app_role_level() >= 80);
+CREATE POLICY site_settings_staff_update ON public.site_settings FOR UPDATE TO authenticated
+  USING (public.app_role_level() >= 80) WITH CHECK (public.app_role_level() >= 80);
+
+GRANT SELECT ON public.site_settings TO anon;
+
+INSERT INTO public.site_settings (id) VALUES ('default') ON CONFLICT (id) DO NOTHING;

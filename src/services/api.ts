@@ -158,6 +158,27 @@ export const updateAgencyProfileApi = async (profile: AgencyProfile) => {
 };
 
 // ---------------------------------------------------------------------------
+// 1b. Public site settings (readable by anonymous landing-page visitors)
+// ---------------------------------------------------------------------------
+
+const SITE_SETTINGS_ROW_ID = 'default';
+
+export const fetchSiteSettingsApi = async (): Promise<{ metaPixelId: string }> => {
+  const { data, error } = await requireSupabase()
+    .from('site_settings').select('metaPixelId').eq('id', SITE_SETTINGS_ROW_ID).maybeSingle();
+  if (error) fail('Load site settings', error);
+  return { metaPixelId: data?.metaPixelId || '' };
+};
+
+export const updateSiteSettingsApi = async (metaPixelId: string) => {
+  await upsertRow('site_settings', {
+    id: SITE_SETTINGS_ROW_ID,
+    metaPixelId: metaPixelId.trim(),
+    updatedAt: new Date().toISOString()
+  });
+};
+
+// ---------------------------------------------------------------------------
 // 2. Roles
 // ---------------------------------------------------------------------------
 

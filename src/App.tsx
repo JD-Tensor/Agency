@@ -1,5 +1,8 @@
-import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { initMetaPixel, trackPixelPageView } from './lib/metaPixel';
+import { fetchSiteSettingsApi } from './services/api';
+import { isSupabaseConfigured } from './services/supabase';
 import { AgencyProvider, useAgency } from './context/AgencyContext';
 import { MainLayout } from './components/layout/MainLayout';
 import { DashboardOverview } from './components/dashboard/DashboardOverview';
@@ -74,8 +77,27 @@ const AppContentViews: React.FC = () => {
   }
 };
 
+const PixelPageViewTracker: React.FC = () => {
+  const location = useLocation();
+  const first = React.useRef(true);
+
+  useEffect(() => {
+    if (first.current) { first.current = false; return; }
+    trackPixelPageView();
+  }, [location.pathname]);
+
+  return null;
+};
+
 const AppRouter: React.FC = () => {
   const { currentUser, authLoading } = useAgency();
+
+  useEffect(() => {
+    if (!isSupabaseConfigured()) { initMetaPixel(); return; }
+    fetchSiteSettingsApi()
+      .then((s) => initMetaPixel(s.metaPixelId))
+      .catch(() => initMetaPixel());
+  }, []);
 
   if (authLoading) {
     return (
@@ -86,7 +108,9 @@ const AppRouter: React.FC = () => {
   }
 
   return (
-    <Routes>
+    <>
+      <PixelPageViewTracker />
+      <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route 
         path="/admin/login" 
@@ -106,7 +130,8 @@ const AppRouter: React.FC = () => {
         } 
       />
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+      </Routes>
+    </>
   );
 };
 

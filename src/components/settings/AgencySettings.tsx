@@ -13,12 +13,16 @@ import {
   Plus,
   Star,
   CheckCircle2,
-  FileSignature
+  FileSignature,
+  Megaphone,
+  Zap
 } from 'lucide-react';
 import { useAgency } from '../../context/AgencyContext';
 import { AgencyProfile } from '../../types/agency';
 import { defaultAgencyProfile } from '../../services/sampleData';
 import { KeyRound, Shield, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { fetchSiteSettingsApi, updateSiteSettingsApi } from '../../services/api';
+import { trackPixelEvent, isMetaPixelActive, getActiveMetaPixelId } from '../../lib/metaPixel';
 
 export const AgencySettings: React.FC = () => {
   const { 
@@ -33,6 +37,40 @@ export const AgencySettings: React.FC = () => {
   } = useAgency();
   const [profile, setProfile] = useState<AgencyProfile>(agencyProfile);
   const [savedNotice, setSavedNotice] = useState<boolean>(false);
+
+  // Meta Pixel settings
+  const [metaPixelId, setMetaPixelId] = useState('');
+  const [pixelLoading, setPixelLoading] = useState(true);
+  const [pixelSaving, setPixelSaving] = useState(false);
+  const [pixelMessage, setPixelMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [testSent, setTestSent] = useState(false);
+
+  useEffect(() => {
+    fetchSiteSettingsApi()
+      .then((s) => setMetaPixelId(s.metaPixelId))
+      .catch(() => { /* no site settings row yet; leave field blank */ })
+      .finally(() => setPixelLoading(false));
+  }, []);
+
+  const handleSavePixel = async () => {
+    setPixelSaving(true);
+    setPixelMessage(null);
+    try {
+      await updateSiteSettingsApi(metaPixelId);
+      setPixelMessage({ type: 'success', text: 'Pixel ID saved. Reload the site for it to take effect on new visits.' });
+    } catch (err) {
+      setPixelMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to save Pixel ID.' });
+    } finally {
+      setPixelSaving(false);
+      setTimeout(() => setPixelMessage(null), 6000);
+    }
+  };
+
+  const handleSendTestEvent = () => {
+    trackPixelEvent('Lead', { content_name: 'Admin Test Event', test_event: true });
+    setTestSent(true);
+    setTimeout(() => setTestSent(false), 4000);
+  };
 
   // Sync signature store & primary signer when agencyProfile changes
   useEffect(() => {
@@ -389,6 +427,88 @@ export const AgencySettings: React.FC = () => {
             </button>
           </div>
         </form>
+      </div>
+
+      {/* Meta Pixel Tracking Card */}
+      <div className="bg-white border border-parchment-200 rounded-xl p-6 shadow-xs relative overflow-hidden">
+        <div className="absolute top-0 left-0 right-0 h-1 bg-clay-600" />
+
+        <div className="flex items-center justify-between pb-4 mb-4 border-b border-parchment-200">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-clay-100 text-clay-700 flex items-center justify-center">
+              <Megaphone className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-ink-950 font-serif">
+                Meta (Facebook) Pixel
+              </h3>
+              <p className="text-[11px] text-ink-500">
+                Tracks landing page visits, section views, and contact form submissions
+              </p>
+            </div>
+          </div>
+          <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${
+            isMetaPixelActive() ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-parchment-100 text-ink-500'
+          }`}>
+            {isMetaPixelActive() ? `Active · ${getActiveMetaPixelId()}` : 'Not loaded in this tab'}
+          </span>
+        </div>
+
+        {pixelMessage && (
+          <div className={`mb-4 p-3 rounded-xl text-xs flex items-center gap-2.5 ${
+            pixelMessage.type === 'success'
+              ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+              : 'bg-rose-50 text-rose-800 border border-rose-200'
+          }`}>
+            {pixelMessage.type === 'success' ? (
+              <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            )}
+            <span>{pixelMessage.text}</span>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 items-end">
+          <div>
+            <label className="block text-xs font-medium text-ink-700 mb-1">Meta Pixel ID</label>
+            <input
+              type="text"
+              value={metaPixelId}
+              onChange={(e) => setMetaPixelId(e.target.value)}
+              placeholder="e.g. 1234567890123456"
+              disabled={pixelLoading}
+              className="w-full text-xs p-2.5 border border-parchment-300 rounded-lg focus:border-clay-600 focus:outline-none bg-parchment-50/40 font-mono"
+            />
+            <p className="text-[10px] text-ink-400 mt-1">
+              Events Manager → Data Sources → your Pixel → copy the numeric ID
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleSavePixel}
+            disabled={pixelSaving || pixelLoading}
+            className="bg-clay-600 hover:bg-clay-700 text-white text-xs font-medium px-4 py-2.5 rounded-lg transition shadow-xs flex items-center gap-1.5 disabled:opacity-60"
+          >
+            <Save className="w-3.5 h-3.5" />
+            <span>{pixelSaving ? 'Saving...' : 'Save Pixel ID'}</span>
+          </button>
+        </div>
+
+        <div className="flex items-center justify-between pt-4 mt-4 border-t border-parchment-100">
+          <p className="text-[11px] text-ink-500 max-w-md">
+            Sends a test <code className="font-mono">Lead</code> event from this browser tab. Open Meta Events Manager → Test Events to confirm it arrives.
+          </p>
+          <button
+            type="button"
+            onClick={handleSendTestEvent}
+            disabled={!isMetaPixelActive()}
+            className="inline-flex items-center gap-1.5 text-xs font-medium bg-clay-50 hover:bg-clay-100 text-clay-800 border border-clay-200 px-3 py-2 rounded-lg transition shadow-2xs disabled:opacity-50 shrink-0"
+          >
+            <Zap className="w-3.5 h-3.5" />
+            <span>{testSent ? 'Test Event Sent!' : 'Send Test Event'}</span>
+          </button>
+        </div>
       </div>
 
       <form onSubmit={handleSave} className="space-y-6">

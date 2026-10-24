@@ -2,7 +2,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, ArrowUpRight, CheckCircle2 } from 'lucide-react';
 import { submitInquiryApi } from '../../services/api';
+import { trackPixelEvent } from '../../lib/metaPixel';
 import './landing.css';
+
+const SECTION_IDS = ['top', 'services', 'work', 'process', 'clients', 'contact'];
 
 /* ---------- content ---------- */
 
@@ -350,7 +353,12 @@ export const LandingPage: React.FC = () => {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSending(true); setFormError('');
-    try { await submitInquiryApi(form); setSent(true); setForm({ name: '', email: '', message: '' }); }
+    try {
+      await submitInquiryApi(form);
+      setSent(true);
+      setForm({ name: '', email: '', message: '' });
+      trackPixelEvent('Lead', { content_name: 'Contact Form' });
+    }
     catch { setFormError('Something went wrong. Please try again or email us directly.'); }
     finally { setSending(false); }
   };
@@ -372,6 +380,26 @@ export const LandingPage: React.FC = () => {
       { threshold: 0.15, rootMargin: '0px 0px -40px 0px' },
     );
     els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, []);
+
+  // section-visit tracking (Meta Pixel), fires once per section per page load
+  useEffect(() => {
+    const seen = new Set<string>();
+    const io = new IntersectionObserver(
+      (es) => es.forEach((e) => {
+        if (!e.isIntersecting) return;
+        const id = e.target.id;
+        if (!id || seen.has(id)) return;
+        seen.add(id);
+        trackPixelEvent('ViewContent', { content_name: id, content_category: 'section' });
+      }),
+      { threshold: 0.4 },
+    );
+    SECTION_IDS.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) io.observe(el);
+    });
     return () => io.disconnect();
   }, []);
 
